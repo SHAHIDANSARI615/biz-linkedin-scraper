@@ -502,53 +502,93 @@ class ScraperManager:
                 self.is_running = False
             return
 
-        scraper = LinkedInScraper(timeout=self.timeout)
+        # Max 3 workers for cloud stability & rate limit prevention
+        worker_count = min(max(1, self.max_workers), 3)
 
         try:
-            for b_start in range(0, len(pending_urls), self.batch_size):
-                with self.lock:
-                    if self.should_stop:
-                        self.add_log("Scraping stopped by user.", "warning")
+            import concurrent.futures
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=worker_count) as executor:
+                futures = {}
+                url_iter = iter(enumerate(pending_urls))
+
+                # Queue initial tasks (worker_count * 2)
+                for _ in range(worker_count * 2):
+                    try:
+                        idx, u = next(url_iter)
+                        fut = executor.submit(scrape_company, u, self.timeout)
+                        futures[fut] = (idx, u)
+                    except StopIteration:
                         break
 
-                batch = pending_urls[b_start:b_start + self.batch_size]
-
-                def on_progress(done_in_b, total_in_b, res):
-                    url = res.get("linkedin_url", "")
-                    success = res.get("success", False)
-                    name = res.get("name", "")
-                    method = res.get("method_used", "")
-
-                    formatted_single = format_row(res, self.selected_fields)
-
+                while futures:
+                    # Check stop flag immediately
                     with self.lock:
-                        self.current_url = url
-                        self.completed = b_start + done_in_b
-                        self.session_records.append(formatted_single)
+                        if self.should_stop:
+                            self.add_log("Stop signal confirmed. Stopping scraper safely...", "warning")
+                            for f in list(futures.keys()):
+                                f.cancel()
+                            break
 
-                        if success:
-                            self.success_count += 1
-                            msg = f"SUCCESS: {name or 'Found data'} via {method} ({url})"
-                            lvl = "success"
-                        else:
-                            err = res.get("error", "No data / Protected")
-                            self.fail_count += 1
-                            msg = f"FAILED: {url} -> {err}"
-                            lvl = "error"
+                    # Wait up to 0.5s for at least one future to finish
+                    done, _ = concurrent.futures.wait(
+                        futures.keys(),
+                        timeout=0.5,
+                        return_when=concurrent.futures.FIRST_COMPLETED
+                    )
 
-                    self.add_log(msg, lvl)
+                    if not done:
+                        continue
 
-                batch_res = scraper.scrape_bulk(
-                    batch,
-                    max_workers=self.max_workers,
-                    callback=on_progress
-                )
+                    for fut in done:
+                        if fut not in futures:
+                            continue
+                        idx, url = futures.pop(fut)
 
-                # Save session checkpoint
-                with self.lock:
-                    records_to_save = list(self.session_records)
+                        try:
+                            res = fut.result()
+                        except Exception as e:
+                            res = {"success": False, "linkedin_url": url, "error": str(e)}
 
-                safe_save(records_to_save, OUTPUT_FILE, OUTPUT_CSV)
+                        success = res.get("success", False)
+                        name = res.get("name", "")
+                        method = res.get("method_used", "")
+                        formatted_single = format_row(res, self.selected_fields)
+
+                        with self.lock:
+                            self.current_url = url
+                            self.completed += 1
+                            self.session_records.append(formatted_single)
+
+                            if success:
+                                self.success_count += 1
+                                msg = f"SUCCESS: {name or 'Found data'} via {method} ({url})"
+                                lvl = "success"
+                            else:
+                                err = res.get("error", "No data / Protected")
+                                self.fail_count += 1
+                                msg = f"FAILED: {url} -> {err}"
+                                lvl = "error"
+
+                        self.add_log(msg, lvl)
+
+                        # Auto-save every 5 URLs
+                        if self.completed % 5 == 0:
+                            with self.lock:
+                                recs_to_save = list(self.session_records)
+                            safe_save(recs_to_save, OUTPUT_FILE, OUTPUT_CSV)
+
+                        # Submit next URL if not requested to stop
+                        with self.lock:
+                            stopping = self.should_stop
+
+                        if not stopping:
+                            try:
+                                next_idx, next_url = next(url_iter)
+                                next_fut = executor.submit(scrape_company, next_url, self.timeout)
+                                futures[next_fut] = (next_idx, next_url)
+                            except StopIteration:
+                                pass
 
         except Exception as e:
             self.add_log(f"Error during scraping: {str(e)}", "error")

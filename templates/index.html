@@ -903,10 +903,13 @@
     }
 
     async function stopScraping() {
+      const btnStop = document.getElementById('btnStop');
+      btnStop.disabled = true;
+      btnStop.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Stopping Session...`;
       try {
         const res = await fetch('/api/stop', { method: 'POST' });
         const data = await res.json();
-        updateStatus();
+        setTimeout(updateStatus, 400);
       } catch (e) {
         console.error(e);
       }

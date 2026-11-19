@@ -186,7 +186,9 @@ def _try_googlebot(url: str, timeout: int) -> Dict[str, Any]:
         "Accept-Language": "en-US,en;q=0.5",
     }
     try:
-        resp = requests.get(url, headers=headers, timeout=timeout, allow_redirects=True)
+        connect_t = min(4, timeout)
+        read_t = min(timeout, 8)
+        resp = requests.get(url, headers=headers, timeout=(connect_t, read_t), allow_redirects=True)
         if resp.status_code == 404:
             return {"success": False, "error": "Page not found (404)",
                     "linkedin_url": url, "_is_404": True}
@@ -407,7 +409,9 @@ def _try_jina(url: str, timeout: int) -> Dict[str, Any]:
         "X-Timeout": str(timeout),
     }
     try:
-        resp = requests.get(jina_url, headers=headers, timeout=timeout + 5)
+        connect_t = min(4, timeout)
+        read_t = min(timeout, 8)
+        resp = requests.get(jina_url, headers=headers, timeout=(connect_t, read_t))
         if resp.status_code != 200:
             return {"success": False, "error": f"Jina HTTP {resp.status_code}",
                     "linkedin_url": url}
@@ -512,9 +516,19 @@ def _try_playwright(url: str, timeout: int) -> Dict[str, Any]:
 
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+            browser = p.chromium.launch(
+                headless=True,
+                args=[
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                    "--single-process",
+                    "--no-zygote",
+                ],
+            )
             context = browser.new_context(
-                viewport={"width": 1920, "height": 1080},
+                viewport={"width": 1280, "height": 800},
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                            "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
                 locale="en-US",
@@ -524,8 +538,9 @@ def _try_playwright(url: str, timeout: int) -> Dict[str, Any]:
             if stealth_sync:
                 stealth_sync(page)
 
-            resp = page.goto(about_url, wait_until="domcontentloaded", timeout=timeout * 1000)
-            page.wait_for_timeout(2000)
+            pw_timeout = min(timeout, 10) * 1000
+            resp = page.goto(about_url, wait_until="domcontentloaded", timeout=pw_timeout)
+            page.wait_for_timeout(1000)
 
             pw_status = resp.status if resp else 0
             html = page.content()
