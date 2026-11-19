@@ -1,0 +1,107 @@
+import pandas as pd
+from linkedin_extractor import LinkedInScraper
+
+# ==============================
+# SETTINGS
+# ==============================
+
+INPUT_FILE = "input.xlsx"
+OUTPUT_FILE = "output.xlsx"
+
+# 3 is a safe starting point
+MAX_WORKERS = 3
+
+# Timeout in seconds
+TIMEOUT = 15
+
+
+# ==============================
+# READ EXCEL
+# ==============================
+
+df = pd.read_excel(INPUT_FILE)
+
+urls = (
+    df["LinkedIn URL"]
+    .dropna()
+    .astype(str)
+    .str.strip()
+    .tolist()
+)
+
+print(f"Found {len(urls)} LinkedIn URLs")
+print("Starting scraper...\n")
+
+
+# ==============================
+# START SCRAPER
+# ==============================
+
+def on_progress(done, total, result):
+    url = result.get("linkedin_url", "")
+    success = result.get("success", False)
+    name = result.get("name", "")
+    method = result.get("method_used", "")
+    
+    status = "SUCCESS" if success else "FAILED"
+    if success:
+        detail = f"{name} | Method: {method}" if name else f"Found data | Method: {method}"
+    else:
+        err = result.get("error", "No data / Protected")
+        detail = f"Reason: {err}"
+        
+    percent = (done / total) * 100
+    print(f"[{done}/{total}] ({percent:.1f}%) [{status}] {url} -> {detail}", flush=True)
+
+scraper = LinkedInScraper(timeout=TIMEOUT)
+
+results = scraper.scrape_bulk(
+    urls,
+    max_workers=MAX_WORKERS,
+    callback=on_progress
+)
+
+
+# ==============================
+# PROCESS RESULTS
+# ==============================
+
+output = []
+
+for r in results:
+
+    output.append({
+        "LinkedIn URL": r.get("linkedin_url", ""),
+        "Company Name": r.get("name", ""),
+        "About / Overview": r.get("description", ""),
+        "Description": r.get("description", ""),
+        "Website": r.get("website", ""),
+        "Industry": r.get("industry", ""),
+        "Company Size": r.get("company_size", ""),
+        "Employee Count": r.get("employee_count", ""),
+        "Employees Min": r.get("employees_min", ""),
+        "Employees Max": r.get("employees_max", ""),
+        "Headquarters": r.get("headquarters", ""),
+        "Founded": r.get("founded", ""),
+        "Followers": r.get("followers", ""),
+        "Method Used": r.get("method_used", ""),
+        "Success": r.get("success", "")
+    })
+
+
+# ==============================
+# SAVE EXCEL
+# ==============================
+
+output_df = pd.DataFrame(output)
+
+output_df.to_excel(
+    OUTPUT_FILE,
+    index=False
+)
+
+print("\n================================")
+print("SCRAPING COMPLETED")
+print("================================")
+print(f"Total URLs : {len(urls)}")
+print(f"Output     : {OUTPUT_FILE}")

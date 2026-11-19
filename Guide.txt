@@ -1,0 +1,269 @@
+# LinkedIn Company Bulk Scraper — Requirements
+
+## 1. System Requirements
+
+* Windows 10 / Windows 11
+* Internet connection
+* Python 3.10 or newer
+* CMD / PowerShell
+* Microsoft Excel (recommended, for input/output files)
+
+---
+
+## 2. Install Python
+
+Download and install Python from the official Python website.
+
+During installation:
+
+* ✅ Check **Add Python to PATH**
+* Then click **Install Now**
+
+After installation, open CMD and check:
+
+```bash
+python --version
+```
+
+Also check:
+
+```bash
+pip --version
+```
+
+Both commands should return a version number.
+
+---
+
+## 3. Install LinkedIn Extractor
+
+Run:
+
+```bash
+pip install company-linkedin-info-extractor
+```
+
+---
+
+## 4. Install Playwright
+
+Playwright is recommended for better scraping success.
+
+Run:
+
+```bash
+pip install playwright playwright-stealth
+```
+
+Then install Chromium:
+
+```bash
+playwright install chromium
+```
+
+---
+
+## 5. Install Excel Support
+
+The bulk scraper uses Excel files.
+
+Run:
+
+```bash
+pip install pandas openpyxl
+```
+
+---
+
+## 6. Verify Installation
+
+Run:
+
+```bash
+python -c "from linkedin_extractor import scrape_company; print('LinkedIn Extractor OK')"
+```
+
+Then:
+
+```bash
+python -c "import pandas; import openpyxl; print('Excel Support OK')"
+```
+
+Then:
+
+```bash
+python -c "import playwright; print('Playwright OK')"
+```
+
+If all three commands show `OK`, the installation is ready.
+
+---
+
+# 7. Project Folder
+
+Create a folder:
+
+```text
+LinkedIn Scraper
+```
+
+The folder should contain:
+
+```text
+LinkedIn Scraper/
+│
+├── input.xlsx
+├── bulk_scraper.py
+└── output.xlsx
+```
+
+`output.xlsx` will be created automatically after scraping.
+
+---
+
+# 8. Input Excel Format
+
+Create:
+
+```text
+input.xlsx
+```
+
+Column A must be named:
+
+```text
+LinkedIn URL
+```
+
+Example:
+
+```text
+LinkedIn URL
+https://www.linkedin.com/company/stripe
+https://www.linkedin.com/company/hubspot
+https://www.linkedin.com/company/datadog
+```
+
+Only public LinkedIn **company pages** should be provided.
+
+---
+
+# 9. Run the Scraper
+
+Open CMD inside the project folder.
+
+Run:
+
+```bash
+python bulk_scraper.py
+```
+
+The scraper will read:
+
+```text
+input.xlsx
+```
+
+and create:
+
+```text
+output.xlsx
+```
+
+---
+
+# 10. Recommended Settings
+
+Start with:
+
+```text
+MAX_WORKERS = 3
+TIMEOUT = 15
+```
+
+For larger batches, avoid using too many simultaneous workers because LinkedIn may temporarily block aggressive requests.
+
+Recommended:
+
+```text
+3–5 workers
+```
+
+---
+
+# 11. Main Python Packages
+
+Required:
+
+```text
+company-linkedin-info-extractor
+pandas
+openpyxl
+playwright
+playwright-stealth
+```
+
+---
+
+# 12. Quick Installation — All Commands
+
+After installing Python, run these commands:
+
+```bash
+pip install company-linkedin-info-extractor
+pip install playwright playwright-stealth
+playwright install chromium
+pip install pandas openpyxl
+```
+
+Then verify:
+
+```bash
+python -c "from linkedin_extractor import scrape_company; print('LinkedIn Extractor OK')"
+```
+
+```bash
+python -c "import pandas; import openpyxl; print('Excel Support OK')"
+```
+
+```bash
+python -c "import playwright; print('Playwright OK')"
+```
+
+---
+
+# 13. Important
+
+This scraper extracts publicly accessible LinkedIn company information.
+
+LinkedIn may rate-limit or temporarily block IP addresses when many requests are made.
+
+For bulk scraping:
+
+* Start with small batches.
+* Keep workers around 3–5.
+* Add delays between large batches.
+* Do not assume every LinkedIn URL will return data.
+* Keep failed URLs so they can be retried later.
+
+---
+
+## Final Setup
+
+Once everything is installed, the normal workflow is simply:
+
+```bash
+python bulk_scraper.py
+```
+
+Input:
+
+```text
+input.xlsx
+```
+
+Output:
+
+```text
+output.xlsx
+```

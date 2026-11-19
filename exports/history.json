@@ -1,0 +1,33 @@
+[
+  {
+    "id": "run_20261119_164619",
+    "timestamp": "19 Nov 2026, 04:46 PM",
+    "source": "Pasted URLs (30)",
+    "total": 30,
+    "extracted": 27,
+    "failed": 3,
+    "fields": [
+      "Company Name",
+      "Industry",
+      "Employee Count",
+      "Founded"
+    ],
+    "excel_file": "run_20261119_164619.xlsx",
+    "csv_file": "run_20261119_164619.csv"
+  },
+  {
+    "id": "run_20261119_163646",
+    "timestamp": "19 Nov 2026, 04:36 PM",
+    "source": "Pasted URLs (2)",
+    "total": 2,
+    "extracted": 2,
+    "failed": 0,
+    "fields": [
+      "Company Name",
+      "Website",
+      "Industry"
+    ],
+    "excel_file": "run_20261119_163646.xlsx",
+    "csv_file": "run_20261119_163646.csv"
+  }
+]

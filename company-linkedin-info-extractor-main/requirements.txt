@@ -1,0 +1,6 @@
+requests>=2.25.0
+beautifulsoup4>=4.9.0
+
+# Optional -- improves success rate from ~70% to ~95%
+# playwright>=1.20.0
+# playwright-stealth>=1.0.0

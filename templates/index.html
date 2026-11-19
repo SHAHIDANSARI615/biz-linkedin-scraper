@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Biz Linkedin Scraper — Professional Intelligence Platform</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    body {
+      background-color: #f8fafc;
+      color: #334155;
+    }
+    /* Custom scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="min-h-screen font-sans antialiased selection:bg-blue-600 selection:text-white" onclick="closeAllDropdowns(event)">
+
+  <!-- Top Navigation Header -->
+  <header class="bg-white/95 border-b border-slate-200 backdrop-blur sticky top-0 z-50 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      
+      <!-- Brand Logo & Name (Biz with Capital B) -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-700 to-sky-500 flex items-center justify-center text-white text-xl font-bold shadow-md shadow-blue-500/20">
+          <i class="fa-brands fa-linkedin-in"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl font-extrabold tracking-tight text-slate-900 flex items-center gap-1.5">
+              Biz <span class="text-sky-600">Linkedin Scraper</span>
+            </h1>
+            <span class="text-[11px] px-2.5 py-0.5 rounded-full font-bold bg-sky-50 text-sky-700 border border-sky-200">
+              Enterprise
+            </span>
+          </div>
+          <p class="text-xs text-slate-500 font-medium">Automated Company Intelligence & Clean Data Extraction</p>
+        </div>
+      </div>
+
+      <!-- Right Header Actions (Live Status) -->
+      <div class="flex items-center gap-3">
+        <div id="statusBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+          <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+          <span>Status: Idle</span>
+        </div>
+
+        <a href="https://linkedin.com" target="_blank" class="text-slate-400 hover:text-slate-700 text-sm p-1.5 rounded-lg hover:bg-slate-100 transition">
+          <i class="fa-solid fa-arrow-up-right-from-square"></i>
+        </a>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+
+    <!-- KPI Metric Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Active Input Pool</span>
+          <span class="w-8 h-8 rounded-lg flex items-center justify-center text-sm bg-sky-50 text-sky-600 border border-sky-100">
+            <i class="fa-solid fa-list-check"></i>
+          </span>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span id="kpiTotal" class="text-3xl font-extrabold text-slate-900">{{ input_count }}</span>
+          <span class="text-xs text-slate-500 font-medium">URLs ready</span>
+        </div>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Completed</span>
+          <span class="w-8 h-8 rounded-lg flex items-center justify-center text-sm bg-indigo-50 text-indigo-600 border border-indigo-100">
+            <i class="fa-solid fa-chart-pie"></i>
+          </span>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span id="kpiCompleted" class="text-3xl font-extrabold text-indigo-600">0</span>
+          <span id="kpiPercent" class="text-xs text-slate-500 font-medium">(0%)</span>
+        </div>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Data Extracted</span>
+          <span class="w-8 h-8 rounded-lg flex items-center justify-center text-sm bg-emerald-50 text-emerald-600 border border-emerald-100">
+            <i class="fa-solid fa-circle-check"></i>
+          </span>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span id="kpiSuccess" class="text-3xl font-extrabold text-emerald-600">0</span>
+          <span class="text-xs text-slate-500 font-medium">companies</span>
+        </div>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-500">No Data / Private</span>
+          <span class="w-8 h-8 rounded-lg flex items-center justify-center text-sm bg-rose-50 text-rose-600 border border-rose-100">
+            <i class="fa-solid fa-circle-exclamation"></i>
+          </span>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span id="kpiFailed" class="text-3xl font-extrabold text-rose-600">0</span>
+          <span class="text-xs text-slate-500 font-medium">failed</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="flex border-b border-slate-200 gap-2">
+      <button onclick="switchTab('bulk')" id="tabBtnBulk" class="px-5 py-3 text-sm font-bold border-b-2 border-sky-600 text-sky-600 flex items-center gap-2">
+        <i class="fa-solid fa-layer-group"></i> Bulk Scraper & URL Input
+      </button>
+      <button onclick="switchTab('single')" id="tabBtnSingle" class="px-5 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center gap-2">
+        <i class="fa-solid fa-bolt"></i> Single URL Inspector
+      </button>
+      <button onclick="switchTab('history')" id="tabBtnHistory" class="px-5 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center gap-2">
+        <i class="fa-solid fa-clock-rotate-left"></i> Run History & Exports
+      </button>
+    </div>
+
+    <!-- TAB 1: BULK SCRAPER -->
+    <div id="tabBulk" class="space-y-6">
+
+      <!-- Completion Banner (Appears when run finishes, auto-dismisses after 6s) -->
+      <div id="completionBanner" class="hidden p-4 rounded-2xl bg-emerald-50 border border-emerald-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all duration-300">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-xl font-bold flex-shrink-0">
+            <i class="fa-solid fa-circle-check"></i>
+          </div>
+          <div>
+            <div class="text-sm font-bold text-emerald-900">Scraping Run Completed Successfully!</div>
+            <div id="completionBannerText" class="text-xs text-emerald-700">All extracted company records have been saved cleanly to your Run History.</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <a href="/api/download/excel" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition">
+            <i class="fa-regular fa-file-excel"></i> Download Excel (.xlsx)
+          </a>
+          <button onclick="switchTab('history')" class="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl border border-slate-300 transition flex items-center gap-1.5">
+            <i class="fa-solid fa-clock-rotate-left text-sky-600"></i> View Run History
+          </button>
+          <button onclick="closeCompletionBanner()" class="w-8 h-8 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-700 flex items-center justify-center transition ml-1 cursor-pointer" title="Dismiss">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- URL Input Box / Mode Toggle -->
+      <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+              <i class="fa-solid fa-link text-sky-600"></i> Choose URL Input Source
+            </h2>
+            <p class="text-xs text-slate-500 mt-0.5">Scrape directly from your Excel file or paste URLs in bulk into the box below.</p>
+          </div>
+
+          <!-- Mode Toggle Buttons -->
+          <div class="inline-flex p-1 rounded-xl bg-slate-100 border border-slate-200">
+            <button onclick="setInputMode('paste')" id="modeBtnPaste" class="px-4 py-2 text-xs font-bold rounded-lg transition bg-white text-sky-700 shadow-xs border border-slate-200">
+              <i class="fa-solid fa-paste mr-1.5"></i> Direct URL Paster (Box)
+            </button>
+            <button onclick="setInputMode('file')" id="modeBtnFile" class="px-4 py-2 text-xs font-bold rounded-lg transition text-slate-500 hover:text-slate-900">
+              <i class="fa-regular fa-file-excel mr-1.5"></i> Excel File ({{ input_file }})
+            </button>
+          </div>
+        </div>
+
+        <!-- Direct URL Paster Box -->
+        <div id="inputModePaste" class="space-y-3 pt-2">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-bold text-slate-800">Paste Minimum or Bulk LinkedIn URLs (1 per line or space/comma separated):</span>
+            <div class="flex items-center gap-2">
+              <span id="pastedCountBadge" class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
+                0 URLs Detected
+              </span>
+              <button onclick="insertSampleUrls()" class="text-[11px] text-sky-600 font-semibold hover:underline">
+                Paste Sample URLs
+              </button>
+              <span class="text-slate-300">|</span>
+              <button onclick="clearUrlPaster()" class="text-[11px] text-rose-500 font-semibold hover:underline">
+                Clear Box
+              </button>
+            </div>
+          </div>
+
+          <textarea id="urlPasterBox" rows="6" oninput="parsePastedUrls()" placeholder="Paste URLs here, e.g.:&#10;https://www.linkedin.com/company/stripe&#10;https://www.linkedin.com/company/google&#10;https://www.linkedin.com/company/microsoft" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs font-mono text-slate-800 focus:bg-white focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition leading-relaxed"></textarea>
+          
+          <p class="text-[11px] text-slate-500 flex items-center gap-1.5">
+            <i class="fa-solid fa-circle-info text-sky-500"></i> You can paste 1 single URL, 10 URLs, or thousands of URLs directly into this box without touching Excel!
+          </p>
+        </div>
+
+        <!-- Excel File Selection Box -->
+        <div id="inputModeFile" class="hidden space-y-3 pt-2">
+          <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-11 h-11 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600 text-2xl font-bold">
+                <i class="fa-regular fa-file-excel"></i>
+              </div>
+              <div>
+                <div class="text-xs text-slate-500 font-medium">Active Input Spreadsheet</div>
+                <div id="inputFileName" class="text-sm font-bold text-slate-900">{{ input_file }} ({{ input_count }} URLs)</div>
+              </div>
+            </div>
+            <label for="fileUploadInput" class="cursor-pointer bg-white hover:bg-slate-100 text-xs font-bold px-4 py-2.5 rounded-xl text-slate-700 border border-slate-300 shadow-xs transition flex items-center gap-1.5">
+              <i class="fa-solid fa-cloud-arrow-up text-sky-600"></i> Upload New Excel/CSV
+            </label>
+            <input type="file" id="fileUploadInput" accept=".xlsx,.xls,.csv" class="hidden" onchange="uploadFile()">
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls & Field Selection Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Column 1: Action Panel -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between space-y-5">
+          <div class="space-y-4">
+            <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+              <i class="fa-solid fa-play text-sky-600"></i> Start Scraping
+            </h2>
+            <p class="text-xs text-slate-500">
+              Scrapes company details using our automated multi-method fallback engine. Each run is saved in Run History.
+            </p>
+
+            <div class="space-y-3 pt-1">
+              <button id="btnStart" onclick="startScraping()" class="w-full py-3.5 px-4 rounded-xl font-bold text-white bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600 shadow-md shadow-sky-500/25 flex items-center justify-center gap-2 transition active:scale-[0.99] cursor-pointer">
+                <i class="fa-solid fa-rocket"></i> Start Scraper Now
+              </button>
+              <button id="btnStop" onclick="stopScraping()" disabled class="w-full py-3 px-4 rounded-xl font-bold text-slate-400 bg-slate-100 border border-slate-200 flex items-center justify-center gap-2 cursor-not-allowed opacity-60 transition">
+                <i class="fa-solid fa-pause"></i> Stop / Pause Session
+              </button>
+            </div>
+          </div>
+
+          <!-- Quick Direct Downloads of Active Session -->
+          <div class="pt-3 border-t border-slate-200 flex items-center justify-between text-xs">
+            <span class="text-slate-500 font-medium">Current Session Export:</span>
+            <div class="flex gap-2 font-bold">
+              <a href="/api/download/excel" class="text-emerald-600 hover:underline flex items-center gap-1">
+                <i class="fa-regular fa-file-excel"></i> .XLSX
+              </a>
+              <span class="text-slate-300">|</span>
+              <a href="/api/download/csv" class="text-sky-600 hover:underline flex items-center gap-1">
+                <i class="fa-solid fa-file-csv"></i> .CSV
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Column 2: Field Selector (TICK ONLY WHAT YOU WANT TO SCRAPE) -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                <i class="fa-solid fa-square-check text-sky-600"></i> Output Fields to Scrape
+              </h2>
+              <p class="text-[11px] text-slate-500 mt-0.5">Tick fields to include in the output file</p>
+            </div>
+            <div class="flex items-center gap-1.5 text-[11px]">
+              <button onclick="selectAllFields(true)" class="text-sky-600 font-bold hover:underline">All</button>
+              <span class="text-slate-300">|</span>
+              <button onclick="selectAllFields(false)" class="text-slate-500 hover:underline">None</button>
+            </div>
+          </div>
+
+          <!-- Field Checkboxes Grid -->
+          <div class="grid grid-cols-2 gap-2.5 pt-1 text-xs font-semibold text-slate-700">
+            <label class="flex items-center gap-2 p-2 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition select-none">
+              <input type="checkbox" name="fieldPick" value="Company Name" checked class="w-4 h-4 accent-sky-600 rounded cursor-pointer">
+              <span>Company Name</span>
+            </label>
+            <label class="flex items-center gap-2 p-2 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition select-none">
+              <input type="checkbox" name="fieldPick" value="Website" checked class="w-4 h-4 accent-sky-600 rounded cursor-pointer">
+              <span>Website</span>
+            </label>
+            <label class="flex items-center gap-2 p-2 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition select-none">
+              <input type="checkbox" name="fieldPick" value="Industry" checked class="w-4 h-4 accent-sky-600 rounded cursor-pointer">
+              <span>Industry</span>
+            </label>
+            <label class="flex items-center gap-2 p-2 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition select-none">
+              <input type="checkbox" name="fieldPick" value="Employee Count" checked class="w-4 h-4 accent-sky-600 rounded cursor-pointer">
+              <span>Employee Count</span>
+            </label>
+            <label class="flex items-center gap-2 p-2 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition select-none">
+              <input type="checkbox" name="fieldPick" value="Company Size" checked class="w-4 h-4 accent-sky-600 rounded cursor-pointer">
+              <span>Company Size</span>
+            </label>
+            <label class="flex items-center gap-2 p-2 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition select-none">
+              <input type="checkbox" name="fieldPick" value="Headquarters" checked class="w-4 h-4 accent-sky-600 rounded cursor-pointer">
+              <span>Headquarters</span>
+            </label>
+            <label class="flex items-center gap-2 p-2 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition select-none">
+              <input type="checkbox" name="fieldPick" value="Founded" checked class="w-4 h-4 accent-sky-600 rounded cursor-pointer">
+              <span>Founded Year</span>
+            </label>
+            <label class="flex items-center gap-2 p-2 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition select-none">
+              <input type="checkbox" name="fieldPick" value="Followers" checked class="w-4 h-4 accent-sky-600 rounded cursor-pointer">
+              <span>Followers</span>
+            </label>
+            <label class="flex items-center gap-2 p-2 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition select-none">
+              <input type="checkbox" name="fieldPick" value="About / Overview" checked class="w-4 h-4 accent-sky-600 rounded cursor-pointer">
+              <span>About / Overview</span>
+            </label>
+            <label class="flex items-center gap-2 p-2 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition select-none">
+              <input type="checkbox" name="fieldPick" value="Description" class="w-4 h-4 accent-sky-600 rounded cursor-pointer">
+              <span>Description</span>
+            </label>
+          </div>
+          
+          <p class="text-[11px] text-slate-500 font-medium">
+            <i class="fa-solid fa-filter text-sky-500 mr-1"></i> Output files will only contain the ticked columns!
+          </p>
+        </div>
+
+        <!-- Column 3: Engine Protections & Live Status -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between space-y-3">
+          <div>
+            <h2 class="text-base font-bold text-slate-900 flex items-center gap-2 mb-2.5">
+              <i class="fa-solid fa-shield-halved text-emerald-600"></i> Engine Protections
+            </h2>
+            <ul class="text-xs text-slate-600 space-y-2 font-medium">
+              <li class="flex items-start gap-2">
+                <i class="fa-solid fa-circle-check text-emerald-500 mt-0.5"></i>
+                <span><strong>No Account Needed:</strong> 100% free fallback extraction chain.</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <i class="fa-solid fa-circle-check text-emerald-500 mt-0.5"></i>
+                <span><strong>Illegal Char Purge:</strong> Zero crashes on XML control characters.</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <i class="fa-solid fa-circle-check text-emerald-500 mt-0.5"></i>
+                <span><strong>Run History Archival:</strong> Every scrape is safely preserved.</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <i class="fa-solid fa-circle-check text-emerald-500 mt-0.5"></i>
+                <span><strong>Clean Session Exports:</strong> No old unrelated rows.</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+            <span class="text-sky-700 font-bold">Currently Scraping:</span>
+            <div id="liveCurrentUrl" class="font-mono text-slate-900 truncate mt-1">None (Ready)</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Live Progress Bar -->
+      <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-3">
+        <div class="flex items-center justify-between text-sm">
+          <span class="font-bold text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-bars-progress text-sky-600"></i> Scraping Progress
+          </span>
+          <span id="progressText" class="font-mono font-bold text-slate-800">0 / 0 (0%)</span>
+        </div>
+        <div class="w-full bg-slate-100 rounded-full h-3.5 border border-slate-200 overflow-hidden p-0.5">
+          <div id="progressBar" class="bg-gradient-to-r from-blue-600 to-sky-500 h-full rounded-full transition-all duration-300 w-0"></div>
+        </div>
+      </div>
+
+      <!-- Live Terminal / Console Window -->
+      <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 text-sm font-bold text-slate-900">
+            <i class="fa-solid fa-terminal text-sky-600"></i> Live Execution Terminal
+          </div>
+          <button onclick="clearLogs()" class="text-xs text-slate-500 hover:text-slate-800 font-medium transition">
+            Clear Logs
+          </button>
+        </div>
+        <div id="terminalLogs" class="bg-slate-900 text-slate-200 rounded-xl p-4 font-mono text-xs h-60 overflow-y-auto space-y-1 border border-slate-800">
+          <div class="text-slate-400">[System] Biz Linkedin Scraper ready. Paste URLs or select Excel to start.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TAB 2: SINGLE URL INSPECTOR -->
+    <div id="tabSingle" class="hidden space-y-6">
+      <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-5">
+        <div>
+          <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-magnifying-glass text-sky-600"></i> Instant Single URL Inspector
+          </h2>
+          <p class="text-xs text-slate-500 mt-1">Test and verify extraction for any single LinkedIn company profile.</p>
+        </div>
+
+        <div class="flex gap-3">
+          <div class="relative flex-1">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+              <i class="fa-brands fa-linkedin text-base"></i>
+            </span>
+            <input type="text" id="singleUrlInput" placeholder="https://www.linkedin.com/company/stripe" class="w-full pl-9 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-sky-500">
+          </div>
+          <button onclick="scrapeSingle()" id="btnSingleScrape" class="px-6 py-3 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-sm transition flex items-center gap-2 cursor-pointer shadow-sm">
+            <i class="fa-solid fa-bolt"></i> Scrape Now
+          </button>
+        </div>
+
+        <!-- Result Card Preview -->
+        <div id="singleResultContainer" class="hidden pt-4 border-t border-slate-200">
+          <div class="bg-slate-50 border border-slate-200 rounded-2xl p-6 space-y-4">
+            <div class="flex items-start justify-between">
+              <div>
+                <h3 id="srName" class="text-2xl font-extrabold text-slate-900">Company Name</h3>
+                <a id="srWebsite" href="#" target="_blank" class="text-xs text-sky-600 font-bold hover:underline">website.com</a>
+              </div>
+              <span id="srMethod" class="px-3 py-1 bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-full text-xs font-mono font-bold">googlebot_jsonld</span>
+            </div>
+
+            <p id="srDescription" class="text-sm text-slate-700 leading-relaxed bg-white p-4 rounded-xl border border-slate-200">
+              Description...
+            </p>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">
+              <div class="p-3 bg-white rounded-xl border border-slate-200">
+                <span class="text-[11px] text-slate-500 font-bold uppercase">Industry</span>
+                <div id="srIndustry" class="text-sm font-bold text-slate-900 mt-0.5">-</div>
+              </div>
+              <div class="p-3 bg-white rounded-xl border border-slate-200">
+                <span class="text-[11px] text-slate-500 font-bold uppercase">Company Size</span>
+                <div id="srSize" class="text-sm font-bold text-slate-900 mt-0.5">-</div>
+              </div>
+              <div class="p-3 bg-white rounded-xl border border-slate-200">
+                <span class="text-[11px] text-slate-500 font-bold uppercase">Employees</span>
+                <div id="srEmployees" class="text-sm font-bold text-slate-900 mt-0.5">-</div>
+              </div>
+              <div class="p-3 bg-white rounded-xl border border-slate-200">
+                <span class="text-[11px] text-slate-500 font-bold uppercase">Headquarters</span>
+                <div id="srHeadquarters" class="text-sm font-bold text-slate-900 mt-0.5">-</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: RUN HISTORY & PAST EXPORTS -->
+    <div id="tabHistory" class="hidden space-y-6">
+      <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <i class="fa-solid fa-clock-rotate-left text-sky-600"></i> Past Scraping Runs & Exports
+            </h2>
+            <p class="text-xs text-slate-500 mt-1">Har run ka record yahan save hota hai. Click the 3 dots (⋮) to download its specific Excel or CSV anytime.</p>
+          </div>
+          <button onclick="loadHistoryTable()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-200 transition flex items-center gap-1.5 cursor-pointer">
+            <i class="fa-solid fa-rotate text-sky-600"></i> Refresh History
+          </button>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-200">
+          <table class="w-full text-left text-xs text-slate-800">
+            <thead class="bg-slate-50 text-slate-600 uppercase font-bold border-b border-slate-200">
+              <tr>
+                <th class="px-4 py-3">Run Date & Time</th>
+                <th class="px-4 py-3">Input Source</th>
+                <th class="px-4 py-3">Extracted Count</th>
+                <th class="px-4 py-3">Selected Fields</th>
+                <th class="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="historyTableBody" class="divide-y divide-slate-200">
+              <tr>
+                <td colspan="5" class="px-4 py-8 text-center text-slate-400 font-medium">
+                  Loading past runs...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Modal for Viewing Records of a Specific Run -->
+  <div id="runRecordsModal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden">
+      <div class="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div>
+          <h3 id="modalRunTitle" class="text-base font-bold text-slate-900">Run Records Preview</h3>
+          <p id="modalRunSubtitle" class="text-xs text-slate-500">Preview of companies scraped in this run</p>
+        </div>
+        <button onclick="closeRecordsModal()" class="w-8 h-8 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="p-5 overflow-auto flex-1">
+        <table class="w-full text-left text-xs text-slate-800">
+          <thead id="modalTableHead" class="bg-slate-50 text-slate-600 uppercase font-bold border-b border-slate-200"></thead>
+          <tbody id="modalTableBody" class="divide-y divide-slate-200"></tbody>
+        </table>
+      </div>
+      <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-end gap-2">
+        <button onclick="closeRecordsModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="border-t border-slate-200 py-6 text-center text-xs text-slate-500 font-medium">
+    Biz Linkedin Scraper &bull; Enterprise Company Intelligence &bull; Crash-Proof & Run History Archival
+  </footer>
+
+  <!-- Scripts -->
+  <script>
+    let pollInterval = null;
+    let isRunning = false;
+    let currentInputMode = 'paste';
+    let detectedUrls = [];
+
+    // Switch Tabs
+    function switchTab(tab) {
+      document.getElementById('tabBulk').classList.toggle('hidden', tab !== 'bulk');
+      document.getElementById('tabSingle').classList.toggle('hidden', tab !== 'single');
+      document.getElementById('tabHistory').classList.toggle('hidden', tab !== 'history');
+
+      const tabs = [
+        { id: 'tabBtnBulk', key: 'bulk' },
+        { id: 'tabBtnSingle', key: 'single' },
+        { id: 'tabBtnHistory', key: 'history' }
+      ];
+
+      tabs.forEach(t => {
+        const btn = document.getElementById(t.id);
+        if (t.key === tab) {
+          btn.className = "px-5 py-3 text-sm font-bold border-b-2 border-sky-600 text-sky-600 flex items-center gap-2";
+        } else {
+          btn.className = "px-5 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center gap-2";
+        }
+      });
+
+      if (tab === 'history') loadHistoryTable();
+    }
+
+    // Input Mode Switcher
+    function setInputMode(mode) {
+      currentInputMode = mode;
+      const btnPaste = document.getElementById('modeBtnPaste');
+      const btnFile = document.getElementById('modeBtnFile');
+      const divPaste = document.getElementById('inputModePaste');
+      const divFile = document.getElementById('inputModeFile');
+
+      if (mode === 'paste') {
+        divPaste.classList.remove('hidden');
+        divFile.classList.add('hidden');
+        btnPaste.className = "px-4 py-2 text-xs font-bold rounded-lg transition bg-white text-sky-700 shadow-xs border border-slate-200";
+        btnFile.className = "px-4 py-2 text-xs font-bold rounded-lg transition text-slate-500 hover:text-slate-900";
+        parsePastedUrls();
+      } else {
+        divPaste.classList.add('hidden');
+        divFile.classList.remove('hidden');
+        btnFile.className = "px-4 py-2 text-xs font-bold rounded-lg transition bg-white text-sky-700 shadow-xs border border-slate-200";
+        btnPaste.className = "px-4 py-2 text-xs font-bold rounded-lg transition text-slate-500 hover:text-slate-900";
+      }
+    }
+
+    // Parse Pasted URLs
+    function parsePastedUrls() {
+      const text = document.getElementById('urlPasterBox').value;
+      const rawLines = text.split(/[\r\n,;\s]+/);
+      detectedUrls = rawLines
+        .map(u => u.trim())
+        .filter(u => u.length > 2)
+        .map(u => {
+          if (!u.startsWith('http://') && !u.startsWith('https://')) {
+            if (u.includes('linkedin.com')) {
+              return 'https://' + u;
+            } else if (u.startsWith('company/')) {
+              return 'https://www.linkedin.com/' + u;
+            } else {
+              return 'https://www.linkedin.com/company/' + u;
+            }
+          }
+          return u;
+        })
+        .filter(u => u.includes('linkedin.com'));
+
+      const badge = document.getElementById('pastedCountBadge');
+      badge.innerText = `${detectedUrls.length} URLs Detected`;
+
+      if (currentInputMode === 'paste' && !isRunning) {
+        document.getElementById('kpiTotal').innerText = detectedUrls.length;
+      }
+    }
+
+    function insertSampleUrls() {
+      const samples = [
+        "https://www.linkedin.com/company/stripe",
+        "https://www.linkedin.com/company/openai",
+        "https://www.linkedin.com/company/github",
+        "https://www.linkedin.com/company/verobotics"
+      ].join('\n');
+      document.getElementById('urlPasterBox').value = samples;
+      parsePastedUrls();
+    }
+
+    function clearUrlPaster() {
+      document.getElementById('urlPasterBox').value = '';
+      parsePastedUrls();
+    }
+
+    // Field Selector Helpers
+    function selectAllFields(checked) {
+      const checkboxes = document.querySelectorAll('input[name="fieldPick"]');
+      checkboxes.forEach(cb => cb.checked = checked);
+    }
+
+    function getSelectedFields() {
+      const checkboxes = document.querySelectorAll('input[name="fieldPick"]:checked');
+      return Array.from(checkboxes).map(cb => cb.value);
+    }
+
+    // Status Polling
+    function startPolling() {
+      if (pollInterval) clearInterval(pollInterval);
+      pollInterval = setInterval(updateStatus, 1500);
+      updateStatus();
+    }
+
+    async function updateStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+
+        const wasRunning = isRunning;
+        isRunning = data.is_running;
+
+        document.getElementById('kpiCompleted').innerText = data.completed;
+        document.getElementById('kpiPercent').innerText = `(${data.percent}%)`;
+        document.getElementById('kpiSuccess').innerText = data.success_count;
+        document.getElementById('kpiFailed').innerText = data.fail_count;
+
+        if (isRunning || currentInputMode === 'file') {
+          if (data.total > 0) document.getElementById('kpiTotal').innerText = data.total;
+        }
+
+        document.getElementById('progressText').innerText = `${data.completed} / ${data.total} (${data.percent}%)`;
+        document.getElementById('progressBar').style.width = `${data.percent}%`;
+        document.getElementById('liveCurrentUrl').innerText = data.current_url || (isRunning ? 'Processing batch...' : 'None (Ready)');
+
+        const badge = document.getElementById('statusBadge');
+        const btnStart = document.getElementById('btnStart');
+        const btnStop = document.getElementById('btnStop');
+
+        if (isRunning) {
+          badge.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200";
+          badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span><span>Scraping Active</span>`;
+          btnStart.disabled = true;
+          btnStart.className = "w-full py-3.5 px-4 rounded-xl font-bold text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed opacity-60";
+          btnStart.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Scraping in Progress...`;
+          btnStop.disabled = false;
+          btnStop.className = "w-full py-3 px-4 rounded-xl font-bold text-white bg-rose-600 hover:bg-rose-500 shadow-md cursor-pointer transition";
+        } else {
+          badge.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200";
+          badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-slate-400"></span><span>Status: Idle</span>`;
+          btnStart.disabled = false;
+          btnStart.className = "w-full py-3.5 px-4 rounded-xl font-bold text-white bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600 shadow-md shadow-sky-500/25 cursor-pointer transition active:scale-[0.99]";
+          btnStart.innerHTML = `<i class="fa-solid fa-rocket"></i> Start Scraper Now`;
+          btnStop.disabled = true;
+          btnStop.className = "w-full py-3 px-4 rounded-xl font-bold text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed opacity-60";
+
+          // If it just finished
+          if (wasRunning && !isRunning && data.completed > 0) {
+            showCompletionBanner(`Run finished with ${data.success_count} successful and ${data.fail_count} failed records. Saved in Run History.`);
+          }
+        }
+
+        // Terminal Logs
+        if (data.logs && data.logs.length > 0) {
+          const term = document.getElementById('terminalLogs');
+          const isAtBottom = term.scrollHeight - term.clientHeight <= term.scrollTop + 50;
+
+          term.innerHTML = data.logs.map(l => {
+            let color = "text-slate-200";
+            if (l.level === "success") color = "text-emerald-400 font-semibold";
+            else if (l.level === "error") color = "text-rose-400 font-semibold";
+            else if (l.level === "warning") color = "text-amber-400";
+            return `<div><span class="text-slate-500">[${l.time}]</span> <span class="${color}">${escapeHtml(l.msg)}</span></div>`;
+          }).join('');
+
+          if (isAtBottom || isRunning) term.scrollTop = term.scrollHeight;
+        }
+
+      } catch (err) {
+        console.error("Status error:", err);
+      }
+    }
+
+    let completionBannerTimer = null;
+
+    function showCompletionBanner(msg) {
+      const banner = document.getElementById('completionBanner');
+      if (!banner) return;
+      banner.classList.remove('hidden');
+      if (msg) document.getElementById('completionBannerText').innerText = msg;
+
+      if (completionBannerTimer) clearTimeout(completionBannerTimer);
+      // Auto-dismiss after 6 seconds
+      completionBannerTimer = setTimeout(() => {
+        closeCompletionBanner();
+      }, 6000);
+    }
+
+    function closeCompletionBanner() {
+      const banner = document.getElementById('completionBanner');
+      if (banner) banner.classList.add('hidden');
+      if (completionBannerTimer) clearTimeout(completionBannerTimer);
+    }
+
+    // Start Scraping
+    async function startScraping() {
+      const selectedFields = getSelectedFields();
+      if (selectedFields.length === 0) {
+        alert("Please select at least one field to scrape!");
+        return;
+      }
+
+      const btnStart = document.getElementById('btnStart');
+      btnStart.disabled = true;
+      btnStart.innerHTML = `<i class="fa-solid fa-circle-notch animate-spin"></i> Initializing...`;
+
+      // Hide completion banner if starting new run
+      const banner = document.getElementById('completionBanner');
+      if (banner) banner.classList.add('hidden');
+
+      const payload = {
+        workers: 3,
+        timeout: 15,
+        batch_size: 20,
+        fields: selectedFields
+      };
+
+      if (currentInputMode === 'paste') {
+        parsePastedUrls();
+        if (detectedUrls.length === 0) {
+          btnStart.disabled = false;
+          btnStart.innerHTML = `<i class="fa-solid fa-rocket"></i> Start Scraper Now`;
+          alert("Please paste at least one LinkedIn URL in the box!");
+          return;
+        }
+        payload.urls = detectedUrls;
+      }
+
+      try {
+        const res = await fetch('/api/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          setTimeout(updateStatus, 300);
+        } else {
+          btnStart.disabled = false;
+          btnStart.innerHTML = `<i class="fa-solid fa-rocket"></i> Start Scraper Now`;
+          alert(data.message || 'Could not start scraper');
+        }
+      } catch (e) {
+        btnStart.disabled = false;
+        btnStart.innerHTML = `<i class="fa-solid fa-rocket"></i> Start Scraper Now`;
+        alert('Network error: ' + e);
+      }
+    }
+
+    async function stopScraping() {
+      try {
+        const res = await fetch('/api/stop', { method: 'POST' });
+        const data = await res.json();
+        updateStatus();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function scrapeSingle() {
+      const url = document.getElementById('singleUrlInput').value.trim();
+      const btn = document.getElementById('btnSingleScrape');
+      if (!url) {
+        alert("Please paste a LinkedIn company URL");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Scraping...`;
+
+      try {
+        const res = await fetch('/api/scrape-single', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, fields: getSelectedFields() })
+        });
+        const data = await res.json();
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-bolt"></i> Scrape Now`;
+
+        if (data.success) {
+          const item = data.data;
+          document.getElementById('srName').innerText = item['Company Name'] || 'No name found';
+          document.getElementById('srWebsite').innerText = item['Website'] || 'No website';
+          document.getElementById('srWebsite').href = item['Website'] ? (item['Website'].startsWith('http') ? item['Website'] : 'https://' + item['Website']) : '#';
+          document.getElementById('srMethod').innerText = item['Method Used'] || 'Unknown';
+          document.getElementById('srDescription').innerText = item['Description'] || item['About / Overview'] || 'No description extracted.';
+          document.getElementById('srIndustry').innerText = item['Industry'] || '-';
+          document.getElementById('srSize').innerText = item['Company Size'] || '-';
+          document.getElementById('srEmployees').innerText = item['Employee Count'] || '-';
+          document.getElementById('srHeadquarters').innerText = item['Headquarters'] || '-';
+
+          document.getElementById('singleResultContainer').classList.remove('hidden');
+        } else {
+          alert("Error: " + data.message);
+        }
+      } catch (e) {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-bolt"></i> Scrape Now`;
+        alert("Request error: " + e);
+      }
+    }
+
+    async function uploadFile() {
+      const fileInput = document.getElementById('fileUploadInput');
+      if (!fileInput.files || fileInput.files.length === 0) return;
+
+      const file = fileInput.files[0];
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('inputFileName').innerText = `${file.name} (${data.count} URLs)`;
+          document.getElementById('kpiTotal').innerText = data.count;
+          alert(`Successfully loaded ${file.name} with ${data.count} LinkedIn URLs.`);
+          updateStatus();
+        } else {
+          alert('Upload failed: ' + data.message);
+        }
+      } catch (e) {
+        alert('Upload error: ' + e);
+      }
+    }
+
+    // Shared Table Renderer
+    function renderCompanyTable(tbodyId, theadId, rows) {
+      const tbody = document.getElementById(tbodyId);
+      const thead = document.getElementById(theadId);
+      if (!tbody || !rows || rows.length === 0) return;
+
+      const firstRow = rows[0];
+      const cols = Object.keys(firstRow).filter(k => k !== 'Success');
+
+      if (thead) {
+        thead.innerHTML = `
+          <tr>
+            ${cols.map(c => `<th class="px-4 py-3">${escapeHtml(c)}</th>`).join('')}
+            <th class="px-4 py-3">Status</th>
+          </tr>
+        `;
+      }
+
+      tbody.innerHTML = rows.map(r => {
+        const success = r['Success'] === true || r['Success'] === 'True';
+        const badge = success
+          ? `<span class="px-2 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold">Extracted</span>`
+          : `<span class="px-2 py-0.5 rounded text-[10px] bg-rose-50 text-rose-700 border border-rose-200 font-bold">Failed</span>`;
+
+        const cells = cols.map(c => {
+          let val = r[c] ?? '';
+          if (c === 'Website' && val) {
+            const url = String(val).startsWith('http') ? val : 'https://' + val;
+            return `<td class="px-4 py-3"><a href="${url}" target="_blank" class="text-sky-600 font-semibold hover:underline">${escapeHtml(String(val))}</a></td>`;
+          }
+          if (c === 'Company Name') {
+            return `<td class="px-4 py-3 font-bold text-slate-900">${escapeHtml(String(val || 'N/A'))}</td>`;
+          }
+          return `<td class="px-4 py-3 text-slate-600 truncate max-w-xs">${escapeHtml(String(val || '-'))}</td>`;
+        }).join('');
+
+        return `<tr class="hover:bg-slate-50 transition">${cells}<td class="px-4 py-3">${badge}</td></tr>`;
+      }).join('');
+    }
+
+    // ==========================================
+    // RUN HISTORY & 3-DOT ACTION MENU MANAGEMENT
+    // ==========================================
+
+    let openDropdownId = null;
+
+    function toggleDropdown(event, runId) {
+      event.stopPropagation();
+      const menu = document.getElementById(`dropdown-${runId}`);
+      if (!menu) return;
+
+      // Close other dropdowns
+      closeAllDropdowns();
+
+      if (openDropdownId === runId) {
+        openDropdownId = null;
+      } else {
+        menu.classList.remove('hidden');
+        openDropdownId = runId;
+      }
+    }
+
+    function closeAllDropdowns(event) {
+      document.querySelectorAll('[id^="dropdown-"]').forEach(el => el.classList.add('hidden'));
+      openDropdownId = null;
+    }
+
+    async function loadHistoryTable() {
+      try {
+        const res = await fetch('/api/history');
+        const data = await res.json();
+        const tbody = document.getElementById('historyTableBody');
+
+        if (!data.history || data.history.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-slate-400 font-medium">No past scraping runs found yet. Start a scrape and it will be recorded here!</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = data.history.map(r => {
+          const fieldsStr = Array.isArray(r.fields) ? r.fields.slice(0, 3).join(', ') + (r.fields.length > 3 ? ` (+${r.fields.length - 3})` : '') : 'All';
+          return `
+            <tr class="hover:bg-slate-50 transition">
+              <td class="px-4 py-3 font-bold text-slate-900">
+                <div class="text-xs font-bold text-slate-900">${escapeHtml(r.timestamp)}</div>
+                <div class="text-[10px] text-slate-400 font-mono font-normal">${escapeHtml(r.id)}</div>
+              </td>
+              <td class="px-4 py-3 text-slate-600 font-medium">${escapeHtml(r.source)}</td>
+              <td class="px-4 py-3">
+                <span class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  ${r.extracted} Extracted
+                </span>
+                ${r.failed > 0 ? `<span class="ml-1 px-2 py-0.5 rounded text-[10px] bg-rose-50 text-rose-700 border border-rose-200 font-semibold">${r.failed} Failed</span>` : ''}
+              </td>
+              <td class="px-4 py-3 text-slate-500 max-w-xs truncate">${escapeHtml(fieldsStr)}</td>
+              <td class="px-4 py-3 text-right">
+                <div class="flex items-center justify-end gap-1.5">
+                  <a href="/api/history/${r.id}/download/excel" class="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold transition flex items-center gap-1.5 shadow-xs" title="Download Clean Excel">
+                    <i class="fa-regular fa-file-excel"></i> Excel (.xlsx)
+                  </a>
+                  <a href="/api/history/${r.id}/download/csv" class="px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 text-xs font-bold transition flex items-center gap-1.5 shadow-xs" title="Download CSV">
+                    <i class="fa-solid fa-file-csv"></i> CSV
+                  </a>
+                  <button onclick="viewRunRecords('${r.id}', '${escapeHtml(r.timestamp)}')" class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer" title="View Records Preview">
+                    <i class="fa-solid fa-eye text-indigo-500"></i> View
+                  </button>
+                  <button onclick="deleteRun('${r.id}')" class="p-1.5 px-2.5 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-transparent hover:border-rose-200 text-xs font-bold transition cursor-pointer" title="Delete This Run">
+                    <i class="fa-regular fa-trash-can"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+      } catch (e) {
+        console.error("History fetch error:", e);
+      }
+    }
+
+    async function viewRunRecords(runId, timestamp) {
+      try {
+        const res = await fetch(`/api/history/${runId}/records`);
+        const data = await res.json();
+
+        document.getElementById('modalRunTitle').innerText = `Records from Run: ${runId}`;
+        document.getElementById('modalRunSubtitle').innerText = `${timestamp} • Showing first 100 rows`;
+
+        renderCompanyTable('modalTableBody', 'modalTableHead', data.rows);
+        document.getElementById('runRecordsModal').classList.remove('hidden');
+      } catch (e) {
+        alert("Error loading run preview: " + e);
+      }
+    }
+
+    function closeRecordsModal() {
+      document.getElementById('runRecordsModal').classList.add('hidden');
+    }
+
+    async function deleteRun(runId) {
+      if (!confirm(`Are you sure you want to delete run ${runId}?`)) return;
+      try {
+        const res = await fetch(`/api/history/${runId}/delete`, { method: 'POST' });
+        loadHistoryTable();
+      } catch (e) {
+        alert("Delete failed: " + e);
+      }
+    }
+
+    function clearLogs() {
+      document.getElementById('terminalLogs').innerHTML = '<div class="text-slate-400">[Logs cleared]</div>';
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      startPolling();
+      parsePastedUrls();
+    });
+  </script>
+</body>
+</html>
