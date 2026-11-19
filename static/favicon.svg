@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7" />
+      <stop offset="60%" stop-color="#0369a1" />
+      <stop offset="100%" stop-color="#0c4a6e" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#0ea5e9" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Background rounded squircle -->
+  <rect width="64" height="64" rx="16" fill="url(#bg)" />
+
+  <!-- Stylized Capital B with data node -->
+  <g filter="url(#shadow)">
+    <!-- Vertical stem -->
+    <rect x="14" y="14" width="8" height="36" rx="4" fill="#ffffff" />
+    
+    <!-- Top bowl -->
+    <path d="M22 14 H35 C40 14 44 17.5 44 22.5 C44 27.5 40 31 35 31 H22 Z" fill="#ffffff" />
+    <path d="M22 19 H34 C36.5 19 38.5 20.5 38.5 22.5 C38.5 24.5 36.5 26 34 26 H22 Z" fill="url(#bg)" />
+
+    <!-- Bottom bowl -->
+    <path d="M22 29 H37 C42.5 29 47 33 47 38.5 C47 44 42.5 48 37 48 H22 Z" fill="#ffffff" />
+    <path d="M22 34 H36 C38.8 34 41 36 41 38.5 C41 41 38.8 43 36 43 H22 Z" fill="url(#bg)" />
+  </g>
+
+  <!-- Glowing green verification / extraction dot -->
+  <circle cx="50" cy="14" r="6" fill="#10b981" stroke="#ffffff" stroke-width="2" />
+</svg>

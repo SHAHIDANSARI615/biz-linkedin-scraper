@@ -5,7 +5,8 @@ import re
 import json
 import threading
 import pandas as pd
-from flask import Flask, render_template, request, jsonify, send_file
+import requests
+from flask import Flask, render_template, request, jsonify, send_file, session, redirect, url_for, send_from_directory
 from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from linkedin_extractor import LinkedInScraper, scrape_company
 
@@ -16,9 +17,11 @@ if hasattr(sys.stdout, "reconfigure"):
     except Exception:
         pass
 
-app = Flask(__name__)
-app.config["SECRET_KEY"] = "biz-linkedin-scraper-secret"
+app = Flask(__name__, static_folder="static")
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "biz-linkedin-scraper-secret-2026")
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50MB max upload
+
+ALLOWED_DOMAIN = "bizprospex.com"
 
 INPUT_FILE = "input.xlsx"
 OUTPUT_FILE = "output.xlsx"
@@ -28,6 +31,143 @@ HISTORY_FILE = os.path.join(EXPORTS_DIR, "history.json")
 
 if not os.path.exists(EXPORTS_DIR):
     os.makedirs(EXPORTS_DIR, exist_ok=True)
+
+
+@app.before_request
+def require_login():
+    """Restrict access: Only users logged in with @bizprospex.com can access the app."""
+    allowed_prefixes = ["/static/", "/login", "/favicon.ico", "/health"]
+    if any(request.path.startswith(p) for p in allowed_prefixes):
+        return None
+    if not session.get("user"):
+        return redirect(url_for("login"))
+
+
+@app.route("/favicon.ico")
+def favicon():
+    return send_from_directory("static", "favicon.svg", mimetype="image/svg+xml")
+
+
+@app.route("/login")
+def login():
+    if session.get("user"):
+        return redirect(url_for("index"))
+    google_configured = bool(os.environ.get("GOOGLE_CLIENT_ID") and os.environ.get("GOOGLE_CLIENT_SECRET"))
+    return render_template("login.html", google_configured=google_configured, error=None)
+
+
+@app.route("/login/google")
+def login_google():
+    client_id = os.environ.get("GOOGLE_CLIENT_ID")
+    if not client_id:
+        return render_template(
+            "login.html",
+            error="Google OAuth Client ID is not yet configured in server environment variables. Please add GOOGLE_CLIENT_ID & GOOGLE_CLIENT_SECRET in Render Environment Settings, or sign in below with your corporate @bizprospex.com email.",
+            google_configured=False,
+        )
+    redirect_uri = url_for("login_callback", _external=True)
+    if redirect_uri.startswith("http://") and "localhost" not in redirect_uri and "127.0.0.1" not in redirect_uri:
+        redirect_uri = "https://" + redirect_uri[7:]
+
+    scope = "openid email profile"
+    auth_url = (
+        f"https://accounts.google.com/o/oauth2/v2/auth"
+        f"?client_id={client_id}"
+        f"&redirect_uri={redirect_uri}"
+        f"&response_type=code"
+        f"&scope={scope}"
+        f"&hd=bizprospex.com"
+        f"&prompt=select_account"
+    )
+    return redirect(auth_url)
+
+
+@app.route("/login/callback")
+def login_callback():
+    code = request.args.get("code")
+    err = request.args.get("error")
+    if err or not code:
+        return render_template("login.html", error=f"Google login failed: {err or 'No authorization code'}", google_configured=True)
+
+    client_id = os.environ.get("GOOGLE_CLIENT_ID")
+    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
+    redirect_uri = url_for("login_callback", _external=True)
+    if redirect_uri.startswith("http://") and "localhost" not in redirect_uri and "127.0.0.1" not in redirect_uri:
+        redirect_uri = "https://" + redirect_uri[7:]
+
+    try:
+        token_resp = requests.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "code": code,
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "redirect_uri": redirect_uri,
+                "grant_type": "authorization_code",
+            },
+            timeout=10,
+        )
+        if not token_resp.ok:
+            return render_template("login.html", error="Failed to verify token with Google.", google_configured=True)
+
+        access_token = token_resp.json().get("access_token")
+        user_resp = requests.get(
+            "https://www.googleapis.com/oauth2/v3/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=10,
+        )
+        if not user_resp.ok:
+            return render_template("login.html", error="Failed to fetch user profile from Google.", google_configured=True)
+
+        userinfo = user_resp.json()
+        email = userinfo.get("email", "").lower().strip()
+
+        # STRICT DOMAIN CHECK: ONLY @bizprospex.com
+        if not email.endswith(f"@{ALLOWED_DOMAIN}"):
+            return render_template(
+                "login.html",
+                error=f"Account '{email}' is not permitted. Only verified @{ALLOWED_DOMAIN} accounts can access Biz Linkedin Scraper.",
+                google_configured=True,
+            )
+
+        session["user"] = {
+            "email": email,
+            "name": userinfo.get("name", email.split("@")[0]),
+            "picture": userinfo.get("picture", ""),
+        }
+        return redirect(url_for("index"))
+    except Exception as e:
+        return render_template("login.html", error=f"Authentication error: {str(e)}", google_configured=True)
+
+
+@app.route("/login/direct", methods=["POST"])
+def login_direct():
+    email = request.form.get("email", "").lower().strip()
+    if not email.endswith(f"@{ALLOWED_DOMAIN}"):
+        return render_template(
+            "login.html",
+            error=f"Access Denied: '{email}' is not an authorized @{ALLOWED_DOMAIN} email.",
+            google_configured=bool(os.environ.get("GOOGLE_CLIENT_ID")),
+        )
+    name = email.split("@")[0].replace(".", " ").title()
+    session["user"] = {
+        "email": email,
+        "name": name,
+        "picture": "",
+    }
+    return redirect(url_for("index"))
+
+
+@app.route("/logout")
+def logout():
+    session.pop("user", None)
+    return redirect(url_for("login"))
+
+
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok", "app": "Biz Linkedin Scraper", "domain": ALLOWED_DOMAIN})
+
 
 
 def clean_for_excel(val):

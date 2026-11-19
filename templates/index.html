@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Biz Linkedin Scraper — Professional Intelligence Platform</title>
+  <title>Biz Linkedin Scraper — Bizprospex Enterprise</title>
+  <!-- Custom Brand Favicon -->
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- FontAwesome Icons -->
@@ -29,32 +31,47 @@
       
       <!-- Brand Logo & Name (Biz with Capital B) -->
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-700 to-sky-500 flex items-center justify-center text-white text-xl font-bold shadow-md shadow-blue-500/20">
-          <i class="fa-brands fa-linkedin-in"></i>
-        </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <h1 class="text-xl font-extrabold tracking-tight text-slate-900 flex items-center gap-1.5">
-              Biz <span class="text-sky-600">Linkedin Scraper</span>
-            </h1>
-            <span class="text-[11px] px-2.5 py-0.5 rounded-full font-bold bg-sky-50 text-sky-700 border border-sky-200">
-              Enterprise
-            </span>
+        <a href="/" class="flex items-center gap-3 group">
+          <img src="/static/favicon.svg" alt="Biz Logo" class="w-10 h-10 rounded-xl shadow-md shadow-sky-500/20 group-hover:scale-105 transition-transform">
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="text-xl font-extrabold tracking-tight text-slate-900 flex items-center gap-1.5">
+                Biz <span class="text-sky-600">Linkedin Scraper</span>
+              </h1>
+              <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-sky-50 text-sky-700 border border-sky-200">
+                Bizprospex
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 font-medium">Automated Company Intelligence & Clean Data Extraction</p>
           </div>
-          <p class="text-xs text-slate-500 font-medium">Automated Company Intelligence & Clean Data Extraction</p>
-        </div>
+        </a>
       </div>
 
-      <!-- Right Header Actions (Live Status) -->
+      <!-- Right Header Actions (Live Status & User Account) -->
       <div class="flex items-center gap-3">
         <div id="statusBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
           <span class="w-2 h-2 rounded-full bg-slate-400"></span>
           <span>Status: Idle</span>
         </div>
 
-        <a href="https://linkedin.com" target="_blank" class="text-slate-400 hover:text-slate-700 text-sm p-1.5 rounded-lg hover:bg-slate-100 transition">
-          <i class="fa-solid fa-arrow-up-right-from-square"></i>
-        </a>
+        {% if session.get('user') %}
+        <!-- User Profile Pill -->
+        <div class="flex items-center gap-2 pl-2 pr-3 py-1 rounded-full bg-slate-50 border border-slate-200 text-xs">
+          {% if session.user.get('picture') %}
+          <img src="{{ session.user.picture }}" alt="User" class="w-6 h-6 rounded-full object-cover border border-slate-200">
+          {% else %}
+          <div class="w-6 h-6 rounded-full bg-sky-600 text-white flex items-center justify-center font-bold text-[10px]">
+            {{ session.user.get('name', 'B')[0]|upper }}
+          </div>
+          {% endif %}
+          <span class="font-semibold text-slate-700 max-w-[130px] truncate" title="{{ session.user.get('email', '') }}">
+            {{ session.user.get('name') or session.user.get('email', '').split('@')[0] }}
+          </span>
+          <a href="/logout" title="Sign Out" class="ml-1 text-slate-400 hover:text-red-600 transition-colors">
+            <i class="fa-solid fa-right-from-bracket"></i>
+          </a>
+        </div>
+        {% endif %}
       </div>
 
     </div>
