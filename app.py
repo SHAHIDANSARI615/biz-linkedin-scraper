@@ -140,24 +140,6 @@ def login_callback():
         return render_template("login.html", error=f"Authentication error: {str(e)}", google_configured=True)
 
 
-@app.route("/login/direct", methods=["POST"])
-def login_direct():
-    email = request.form.get("email", "").lower().strip()
-    if not email.endswith(f"@{ALLOWED_DOMAIN}"):
-        return render_template(
-            "login.html",
-            error=f"Access Denied: '{email}' is not an authorized @{ALLOWED_DOMAIN} email.",
-            google_configured=bool(os.environ.get("GOOGLE_CLIENT_ID")),
-        )
-    name = email.split("@")[0].replace(".", " ").title()
-    session["user"] = {
-        "email": email,
-        "name": name,
-        "picture": "",
-    }
-    return redirect(url_for("index"))
-
-
 @app.route("/logout")
 def logout():
     session.pop("user", None)
