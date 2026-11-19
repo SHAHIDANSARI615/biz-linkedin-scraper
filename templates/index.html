@@ -499,19 +499,19 @@
           </div>
         </div>
 
-        <div class="overflow-x-auto rounded-xl border border-slate-200">
-          <table class="w-full text-left text-xs text-slate-800">
-            <thead class="bg-slate-50 text-slate-600 uppercase font-bold border-b border-slate-200">
+        <div class="overflow-x-auto rounded-2xl border border-slate-200 shadow-xs">
+          <table class="w-full text-left text-xs text-slate-800 whitespace-nowrap min-w-[960px]">
+            <thead class="bg-slate-50/90 text-slate-600 uppercase font-bold border-b border-slate-200">
               <tr>
-                <th class="px-4 py-3">Run Date & Time</th>
-                <th class="px-4 py-3">Run By</th>
-                <th class="px-4 py-3">Input Source</th>
-                <th class="px-4 py-3">Extracted Count</th>
-                <th class="px-4 py-3">Selected Fields</th>
-                <th class="px-4 py-3 text-right">Actions</th>
+                <th class="px-4 py-3.5 min-w-[170px]">Run Date & Time</th>
+                <th class="px-4 py-3.5 min-w-[150px]">Run By</th>
+                <th class="px-4 py-3.5 min-w-[140px]">Input Source</th>
+                <th class="px-4 py-3.5 min-w-[180px]">Extracted Count</th>
+                <th class="px-4 py-3.5 min-w-[200px]">Selected Fields</th>
+                <th class="px-4 py-3.5 text-right min-w-[240px]">Actions</th>
               </tr>
             </thead>
-            <tbody id="historyTableBody" class="divide-y divide-slate-200">
+            <tbody id="historyTableBody" class="divide-y divide-slate-100">
               <tr>
                 <td colspan="6" class="px-4 py-8 text-center text-slate-400 font-medium">
                   Loading past runs...
@@ -1065,37 +1065,41 @@
           const fieldsStr = Array.isArray(r.fields) ? r.fields.slice(0, 3).join(', ') + (r.fields.length > 3 ? ` (+${r.fields.length - 3})` : '') : 'All';
           const userStr = r.executed_by || 'Corporate User';
           return `
-            <tr class="hover:bg-slate-50 transition">
-              <td class="px-4 py-3 font-bold text-slate-900">
+            <tr class="hover:bg-slate-50/70 transition">
+              <td class="px-4 py-3.5 whitespace-nowrap">
                 <div class="text-xs font-bold text-slate-900">${escapeHtml(r.timestamp)}</div>
                 <div class="text-[10px] text-slate-400 font-mono font-normal">${escapeHtml(r.id)}</div>
               </td>
-              <td class="px-4 py-3">
-                <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium">
-                  <i class="fa-solid fa-user-circle text-sky-600 text-xs"></i>
+              <td class="px-4 py-3.5 whitespace-nowrap">
+                <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold whitespace-nowrap">
+                  <i class="fa-solid fa-circle-user text-sky-600 text-xs"></i>
                   <span>${escapeHtml(userStr)}</span>
                 </div>
               </td>
-              <td class="px-4 py-3 text-slate-600 font-medium">${escapeHtml(r.source)}</td>
-              <td class="px-4 py-3">
-                <span class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  ${r.extracted} Extracted
-                </span>
-                ${r.failed > 0 ? `<span class="ml-1 px-2 py-0.5 rounded text-[10px] bg-rose-50 text-rose-700 border border-rose-200 font-semibold">${r.failed} Failed</span>` : ''}
+              <td class="px-4 py-3.5 whitespace-nowrap text-slate-700 font-medium">${escapeHtml(r.source)}</td>
+              <td class="px-4 py-3.5 whitespace-nowrap">
+                <div class="inline-flex items-center gap-1.5">
+                  <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                    ${r.extracted} Extracted
+                  </span>
+                  ${r.failed > 0 ? `<span class="px-2 py-1 rounded-lg text-xs bg-rose-50 text-rose-700 border border-rose-200 font-bold whitespace-nowrap">${r.failed} Failed</span>` : ''}
+                </div>
               </td>
-              <td class="px-4 py-3 text-slate-500 max-w-xs truncate">${escapeHtml(fieldsStr)}</td>
-              <td class="px-4 py-3 text-right">
-                <div class="flex items-center justify-end gap-1.5">
-                  <a href="/api/history/${r.id}/download/excel" class="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold transition flex items-center gap-1.5 shadow-xs" title="Download Clean Excel">
+              <td class="px-4 py-3.5 text-slate-500 max-w-[200px] truncate" title="${escapeHtml(Array.isArray(r.fields) ? r.fields.join(', ') : 'All')}">
+                ${escapeHtml(fieldsStr)}
+              </td>
+              <td class="px-4 py-3.5 text-right whitespace-nowrap">
+                <div class="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
+                  <a href="/api/history/${r.id}/download/excel" class="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold transition inline-flex items-center gap-1.5 shadow-xs whitespace-nowrap" title="Download Excel">
                     <i class="fa-regular fa-file-excel"></i> Excel (.xlsx)
                   </a>
-                  <a href="/api/history/${r.id}/download/csv" class="px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 text-xs font-bold transition flex items-center gap-1.5 shadow-xs" title="Download CSV">
+                  <a href="/api/history/${r.id}/download/csv" class="px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 text-xs font-bold transition inline-flex items-center gap-1.5 shadow-xs whitespace-nowrap" title="Download CSV">
                     <i class="fa-solid fa-file-csv"></i> CSV
                   </a>
-                  <button onclick="viewRunRecords('${r.id}', '${escapeHtml(r.timestamp)}')" class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer" title="View Records Preview">
+                  <button onclick="viewRunRecords('${r.id}', '${escapeHtml(r.timestamp)}')" class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-bold transition inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap" title="View Records Preview">
                     <i class="fa-solid fa-eye text-indigo-500"></i> View
                   </button>
-                  <button onclick="deleteRun('${r.id}')" class="p-1.5 px-2.5 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-transparent hover:border-rose-200 text-xs font-bold transition cursor-pointer" title="Delete This Run">
+                  <button onclick="deleteRun('${r.id}')" class="p-1.5 px-2.5 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-transparent hover:border-rose-200 text-xs font-bold transition cursor-pointer whitespace-nowrap" title="Delete This Run">
                     <i class="fa-regular fa-trash-can"></i>
                   </button>
                 </div>
