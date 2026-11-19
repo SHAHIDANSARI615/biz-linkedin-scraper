@@ -82,11 +82,46 @@ def login_google():
     return redirect(auth_url)
 
 
+LOGIN_AUDIT_FILE = os.path.join(EXPORTS_DIR, "login_audit.json")
+
+
+def record_login_audit(email, name, ip, status="SUCCESS", reason=""):
+    """Record corporate login audit log for tracking and security."""
+    try:
+        events = []
+        if os.path.exists(LOGIN_AUDIT_FILE):
+            try:
+                with open(LOGIN_AUDIT_FILE, "r", encoding="utf-8") as f:
+                    events = json.load(f)
+            except Exception:
+                events = []
+        event = {
+            "time": time.strftime("%d %b %Y, %I:%M:%S %p"),
+            "email": email,
+            "name": name,
+            "ip": ip,
+            "status": status,
+            "reason": reason,
+        }
+        events.insert(0, event)
+        events = events[:300]
+        with open(LOGIN_AUDIT_FILE, "w", encoding="utf-8") as f:
+            json.dump(events, f, indent=2)
+        print(f"🔔 [LOGIN AUDIT] {status} - User: {name} ({email}) | IP: {ip} | Time: {event['time']}")
+    except Exception as e:
+        print(f"[Audit Error] {e}")
+
+
 @app.route("/login/callback")
 def login_callback():
     code = request.args.get("code")
     err = request.args.get("error")
+    client_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+    if client_ip and "," in client_ip:
+        client_ip = client_ip.split(",")[0].strip()
+
     if err or not code:
+        record_login_audit("unknown", "Unknown", client_ip, "FAILED", err or "No authorization code")
         return render_template("login.html", error=f"Google login failed: {err or 'No authorization code'}", google_configured=True)
 
     client_id = os.environ.get("GOOGLE_CLIENT_ID")
@@ -108,6 +143,7 @@ def login_callback():
             timeout=10,
         )
         if not token_resp.ok:
+            record_login_audit("unknown", "Unknown", client_ip, "FAILED", "Invalid Google Token")
             return render_template("login.html", error="Failed to verify token with Google.", google_configured=True)
 
         access_token = token_resp.json().get("access_token")
@@ -117,27 +153,49 @@ def login_callback():
             timeout=10,
         )
         if not user_resp.ok:
+            record_login_audit("unknown", "Unknown", client_ip, "FAILED", "Failed fetching user info")
             return render_template("login.html", error="Failed to fetch user profile from Google.", google_configured=True)
 
         userinfo = user_resp.json()
         email = userinfo.get("email", "").lower().strip()
+        user_name = userinfo.get("name", email.split("@")[0])
 
         # STRICT DOMAIN CHECK: ONLY @bizprospex.com
         if not email.endswith(f"@{ALLOWED_DOMAIN}"):
+            record_login_audit(email, user_name, client_ip, "BLOCKED", f"Rejected: Not @{ALLOWED_DOMAIN}")
             return render_template(
                 "login.html",
                 error=f"Account '{email}' is not permitted. Only verified @{ALLOWED_DOMAIN} accounts can access Biz Linkedin Scraper.",
                 google_configured=True,
             )
 
+        # Successful Login Audit
+        record_login_audit(email, user_name, client_ip, "SUCCESS", "Logged In")
+
         session["user"] = {
             "email": email,
-            "name": userinfo.get("name", email.split("@")[0]),
+            "name": user_name,
             "picture": userinfo.get("picture", ""),
         }
         return redirect(url_for("index"))
     except Exception as e:
+        record_login_audit("unknown", "Unknown", client_ip, "ERROR", str(e))
         return render_template("login.html", error=f"Authentication error: {str(e)}", google_configured=True)
+
+
+@app.route("/api/admin/logins")
+def api_admin_logins():
+    """Returns recent login audit activity."""
+    if not session.get("user"):
+        return jsonify({"error": "Unauthorized"}), 401
+    events = []
+    if os.path.exists(LOGIN_AUDIT_FILE):
+        try:
+            with open(LOGIN_AUDIT_FILE, "r", encoding="utf-8") as f:
+                events = json.load(f)
+        except Exception:
+            events = []
+    return jsonify({"success": True, "logins": events})
 
 
 @app.route("/logout")
@@ -257,7 +315,7 @@ def save_history(history):
         print(f"[Warning] History save error: {e}")
 
 
-def add_run_to_history(run_id, source_name, total, extracted, failed, fields, records):
+def add_run_to_history(run_id, source_name, total, extracted, failed, fields, records, executed_by=""):
     history = load_history()
     excel_name = f"{run_id}.xlsx"
     csv_name = f"{run_id}.csv"
@@ -274,6 +332,7 @@ def add_run_to_history(run_id, source_name, total, extracted, failed, fields, re
         "extracted": extracted,
         "failed": failed,
         "fields": fields or ["All Fields"],
+        "executed_by": executed_by or "Bizprospex Team Member",
         "excel_file": excel_name,
         "csv_file": csv_name
     }
@@ -327,7 +386,7 @@ class ScraperManager:
                 "last_run": self.last_completed_run
             }
 
-    def start_scraping(self, urls, max_workers=3, timeout=15, batch_size=20, resume=False, selected_fields=None, is_manual=False):
+    def start_scraping(self, urls, max_workers=3, timeout=15, batch_size=20, resume=False, selected_fields=None, is_manual=False, executed_by=""):
         with self.lock:
             if self.is_running:
                 return False, "Scraper is already running"
@@ -338,6 +397,7 @@ class ScraperManager:
             self.timeout = timeout
             self.batch_size = batch_size
             self.selected_fields = selected_fields
+            self.executed_by = executed_by or "Bizprospex Member"
             self.completed = 0
             self.success_count = 0
             self.fail_count = 0
@@ -451,7 +511,8 @@ class ScraperManager:
                     self.success_count,
                     self.fail_count,
                     self.selected_fields,
-                    records_to_save
+                    records_to_save,
+                    executed_by=getattr(self, "executed_by", "Bizprospex Member")
                 )
                 with self.lock:
                     self.last_completed_run = run_entry
@@ -512,6 +573,9 @@ def api_start():
     if not urls:
         return jsonify({"success": False, "message": "No URLs found to scrape."}), 400
 
+    user = session.get("user", {})
+    user_label = user.get("name") or user.get("email") or "Bizprospex Member"
+
     ok, msg = manager.start_scraping(
         urls,
         max_workers=workers,
@@ -519,7 +583,8 @@ def api_start():
         batch_size=batch_size,
         resume=False,
         selected_fields=selected_fields,
-        is_manual=is_manual
+        is_manual=is_manual,
+        executed_by=user_label
     )
     if ok:
         return jsonify({"success": True, "message": msg, "total": len(urls)})

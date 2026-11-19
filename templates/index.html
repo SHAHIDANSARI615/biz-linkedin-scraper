@@ -478,11 +478,16 @@
             <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
               <i class="fa-solid fa-clock-rotate-left text-sky-600"></i> Past Scraping Runs & Exports
             </h2>
-            <p class="text-xs text-slate-500 mt-1">Har run ka record yahan save hota hai. Click the 3 dots (⋮) to download its specific Excel or CSV anytime.</p>
+            <p class="text-xs text-slate-500 mt-1">Har run ka record aur kis team member ne chalaya, sab yahan tracked rehta hai.</p>
           </div>
-          <button onclick="loadHistoryTable()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-200 transition flex items-center gap-1.5 cursor-pointer">
-            <i class="fa-solid fa-rotate text-sky-600"></i> Refresh History
-          </button>
+          <div class="flex items-center gap-2">
+            <button onclick="openLoginAuditModal()" class="px-3.5 py-2 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold border border-sky-200 transition flex items-center gap-1.5 cursor-pointer">
+              <i class="fa-solid fa-user-shield text-sky-600"></i> View Login Activity
+            </button>
+            <button onclick="loadHistoryTable()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-200 transition flex items-center gap-1.5 cursor-pointer">
+              <i class="fa-solid fa-rotate text-sky-600"></i> Refresh History
+            </button>
+          </div>
         </div>
 
         <div class="overflow-x-auto rounded-xl border border-slate-200">
@@ -490,6 +495,7 @@
             <thead class="bg-slate-50 text-slate-600 uppercase font-bold border-b border-slate-200">
               <tr>
                 <th class="px-4 py-3">Run Date & Time</th>
+                <th class="px-4 py-3">Run By</th>
                 <th class="px-4 py-3">Input Source</th>
                 <th class="px-4 py-3">Extracted Count</th>
                 <th class="px-4 py-3">Selected Fields</th>
@@ -498,7 +504,7 @@
             </thead>
             <tbody id="historyTableBody" class="divide-y divide-slate-200">
               <tr>
-                <td colspan="5" class="px-4 py-8 text-center text-slate-400 font-medium">
+                <td colspan="6" class="px-4 py-8 text-center text-slate-400 font-medium">
                   Loading past runs...
                 </td>
               </tr>
@@ -541,6 +547,49 @@
   </footer>
 
   <!-- Scripts -->
+  <!-- Modal for Viewing User Login Audit History -->
+  <div id="loginAuditModal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-3xl w-full max-h-[80vh] flex flex-col overflow-hidden">
+      <div class="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div>
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-shield-halved text-sky-600"></i> Corporate Login & Access Audit
+          </h3>
+          <p class="text-xs text-slate-500">Live record of all team sign-ins and blocked unauthorized attempts</p>
+        </div>
+        <button onclick="closeLoginAuditModal()" class="w-8 h-8 rounded-lg hover:bg-slate-200 text-slate-500 flex items-center justify-center transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="p-4 overflow-y-auto max-h-[60vh]">
+        <div class="rounded-xl border border-slate-200 overflow-hidden">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-slate-600 uppercase font-bold border-b border-slate-200">
+              <tr>
+                <th class="px-4 py-2.5">Date & Time</th>
+                <th class="px-4 py-2.5">User Details</th>
+                <th class="px-4 py-2.5">IP Address</th>
+                <th class="px-4 py-2.5 text-right">Access Status</th>
+              </tr>
+            </thead>
+            <tbody id="loginAuditTableBody" class="divide-y divide-slate-100">
+              <tr>
+                <td colspan="4" class="px-4 py-6 text-center text-slate-400">Loading audit history...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+        <button onclick="closeLoginAuditModal()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition">
+          Close Audit
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let pollInterval = null;
     let isRunning = false;
@@ -956,17 +1005,24 @@
         const tbody = document.getElementById('historyTableBody');
 
         if (!data.history || data.history.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-slate-400 font-medium">No past scraping runs found yet. Start a scrape and it will be recorded here!</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-8 text-center text-slate-400 font-medium">No past scraping runs found yet. Start a scrape and it will be recorded here!</td></tr>`;
           return;
         }
 
         tbody.innerHTML = data.history.map(r => {
           const fieldsStr = Array.isArray(r.fields) ? r.fields.slice(0, 3).join(', ') + (r.fields.length > 3 ? ` (+${r.fields.length - 3})` : '') : 'All';
+          const userStr = r.executed_by || 'Corporate User';
           return `
             <tr class="hover:bg-slate-50 transition">
               <td class="px-4 py-3 font-bold text-slate-900">
                 <div class="text-xs font-bold text-slate-900">${escapeHtml(r.timestamp)}</div>
                 <div class="text-[10px] text-slate-400 font-mono font-normal">${escapeHtml(r.id)}</div>
+              </td>
+              <td class="px-4 py-3">
+                <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium">
+                  <i class="fa-solid fa-user-circle text-sky-600 text-xs"></i>
+                  <span>${escapeHtml(userStr)}</span>
+                </div>
               </td>
               <td class="px-4 py-3 text-slate-600 font-medium">${escapeHtml(r.source)}</td>
               <td class="px-4 py-3">
@@ -1028,6 +1084,47 @@
       } catch (e) {
         alert("Delete failed: " + e);
       }
+    }
+
+    async function openLoginAuditModal() {
+      try {
+        const res = await fetch('/api/admin/logins');
+        const data = await res.json();
+        const tbody = document.getElementById('loginAuditTableBody');
+
+        if (!data.logins || data.logins.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="4" class="px-4 py-8 text-center text-slate-400 font-medium">No login events recorded yet.</td></tr>`;
+        } else {
+          tbody.innerHTML = data.logins.map(l => {
+            const isSuccess = l.status === 'SUCCESS';
+            const badgeClass = isSuccess 
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+              : 'bg-rose-50 text-rose-700 border-rose-200';
+            return `
+              <tr class="hover:bg-slate-50 transition">
+                <td class="px-4 py-3 font-semibold text-slate-900 text-xs">${escapeHtml(l.time)}</td>
+                <td class="px-4 py-3">
+                  <div class="text-xs font-bold text-slate-900">${escapeHtml(l.name)}</div>
+                  <div class="text-[11px] text-slate-500">${escapeHtml(l.email)}</div>
+                </td>
+                <td class="px-4 py-3 font-mono text-slate-500 text-[11px]">${escapeHtml(l.ip)}</td>
+                <td class="px-4 py-3 text-right">
+                  <span class="px-2.5 py-1 rounded-full text-[10px] font-bold border ${badgeClass}">
+                    ${escapeHtml(l.status)} ${l.reason ? `• ${escapeHtml(l.reason)}` : ''}
+                  </span>
+                </td>
+              </tr>
+            `;
+          }).join('');
+        }
+        document.getElementById('loginAuditModal').classList.remove('hidden');
+      } catch (e) {
+        alert("Error loading login audit: " + e);
+      }
+    }
+
+    function closeLoginAuditModal() {
+      document.getElementById('loginAuditModal').classList.add('hidden');
     }
 
     function clearLogs() {
