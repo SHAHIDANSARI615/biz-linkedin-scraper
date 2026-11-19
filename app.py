@@ -83,10 +83,45 @@ def login_google():
 
 
 LOGIN_AUDIT_FILE = os.path.join(EXPORTS_DIR, "login_audit.json")
+ADMINS_FILE = os.path.join(EXPORTS_DIR, "admins.json")
+DEFAULT_ADMIN = "shahid@bizprospex.com"
 
 
-def record_login_audit(email, name, ip, status="SUCCESS", reason=""):
-    """Record corporate login audit log for tracking and security."""
+def get_admin_emails():
+    """Returns list of authorized admin emails."""
+    admins = [DEFAULT_ADMIN.lower()]
+    if os.path.exists(ADMINS_FILE):
+        try:
+            with open(ADMINS_FILE, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+                if isinstance(saved, list):
+                    admins = list(set([e.lower().strip() for e in saved if e and isinstance(e, str)] + [DEFAULT_ADMIN.lower()]))
+        except Exception:
+            pass
+    return admins
+
+
+def is_user_admin(email):
+    """Check if email belongs to authorized admin."""
+    if not email:
+        return False
+    return email.lower().strip() in get_admin_emails()
+
+
+def save_admin_emails(admins_list):
+    """Save persistent list of admin emails."""
+    try:
+        clean = list(set([e.lower().strip() for e in admins_list if e and e.strip()]))
+        if DEFAULT_ADMIN.lower() not in clean:
+            clean.append(DEFAULT_ADMIN.lower())
+        with open(ADMINS_FILE, "w", encoding="utf-8") as f:
+            json.dump(clean, f, indent=2)
+    except Exception as e:
+        print(f"[Error saving admins] {e}")
+
+
+def record_login_audit(email):
+    """Record corporate login audit log (email and timestamp only)."""
     try:
         events = []
         if os.path.exists(LOGIN_AUDIT_FILE):
@@ -96,18 +131,14 @@ def record_login_audit(email, name, ip, status="SUCCESS", reason=""):
             except Exception:
                 events = []
         event = {
-            "time": time.strftime("%d %b %Y, %I:%M:%S %p"),
             "email": email,
-            "name": name,
-            "ip": ip,
-            "status": status,
-            "reason": reason,
+            "time": time.strftime("%d %b %Y, %I:%M %p"),
         }
         events.insert(0, event)
-        events = events[:300]
+        events = events[:500]
         with open(LOGIN_AUDIT_FILE, "w", encoding="utf-8") as f:
             json.dump(events, f, indent=2)
-        print(f"🔔 [LOGIN AUDIT] {status} - User: {name} ({email}) | IP: {ip} | Time: {event['time']}")
+        print(f"🔔 [LOGIN AUDIT] User: {email} | Time: {event['time']}")
     except Exception as e:
         print(f"[Audit Error] {e}")
 
@@ -116,13 +147,9 @@ def record_login_audit(email, name, ip, status="SUCCESS", reason=""):
 def login_callback():
     code = request.args.get("code")
     err = request.args.get("error")
-    client_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
-    if client_ip and "," in client_ip:
-        client_ip = client_ip.split(",")[0].strip()
 
     if err or not code:
-        record_login_audit("unknown", "Unknown", client_ip, "FAILED", err or "No authorization code")
-        return render_template("login.html", error=f"Google login failed: {err or 'No authorization code'}", google_configured=True)
+        return render_template("login.html", error=f"Google sign-in failed: {err or 'No authorization code'}", google_configured=True)
 
     client_id = os.environ.get("GOOGLE_CLIENT_ID")
     client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
@@ -143,7 +170,6 @@ def login_callback():
             timeout=10,
         )
         if not token_resp.ok:
-            record_login_audit("unknown", "Unknown", client_ip, "FAILED", "Invalid Google Token")
             return render_template("login.html", error="Failed to verify token with Google.", google_configured=True)
 
         access_token = token_resp.json().get("access_token")
@@ -153,7 +179,6 @@ def login_callback():
             timeout=10,
         )
         if not user_resp.ok:
-            record_login_audit("unknown", "Unknown", client_ip, "FAILED", "Failed fetching user info")
             return render_template("login.html", error="Failed to fetch user profile from Google.", google_configured=True)
 
         userinfo = user_resp.json()
@@ -162,15 +187,14 @@ def login_callback():
 
         # STRICT DOMAIN CHECK: ONLY @bizprospex.com
         if not email.endswith(f"@{ALLOWED_DOMAIN}"):
-            record_login_audit(email, user_name, client_ip, "BLOCKED", f"Rejected: Not @{ALLOWED_DOMAIN}")
             return render_template(
                 "login.html",
                 error=f"Account '{email}' is not permitted. Only verified @{ALLOWED_DOMAIN} accounts can access Biz Linkedin Scraper.",
                 google_configured=True,
             )
 
-        # Successful Login Audit
-        record_login_audit(email, user_name, client_ip, "SUCCESS", "Logged In")
+        # Successful Login Audit (Records Email and Timestamp)
+        record_login_audit(email)
 
         session["user"] = {
             "email": email,
@@ -179,15 +203,17 @@ def login_callback():
         }
         return redirect(url_for("index"))
     except Exception as e:
-        record_login_audit("unknown", "Unknown", client_ip, "ERROR", str(e))
         return render_template("login.html", error=f"Authentication error: {str(e)}", google_configured=True)
 
 
 @app.route("/api/admin/logins")
 def api_admin_logins():
-    """Returns recent login audit activity."""
-    if not session.get("user"):
-        return jsonify({"error": "Unauthorized"}), 401
+    """Returns recent login audit activity (Admin only)."""
+    user = session.get("user", {})
+    user_email = user.get("email", "").lower().strip()
+    if not is_user_admin(user_email):
+        return jsonify({"error": "Unauthorized. Admin rights required."}), 403
+
     events = []
     if os.path.exists(LOGIN_AUDIT_FILE):
         try:
@@ -195,7 +221,38 @@ def api_admin_logins():
                 events = json.load(f)
         except Exception:
             events = []
-    return jsonify({"success": True, "logins": events})
+    return jsonify({"success": True, "logins": events, "admins": get_admin_emails()})
+
+
+@app.route("/api/admin/transfer", methods=["POST"])
+def api_admin_transfer():
+    """Transfer or delegate admin access to another @bizprospex.com account."""
+    user = session.get("user", {})
+    user_email = user.get("email", "").lower().strip()
+    if not is_user_admin(user_email):
+        return jsonify({"success": False, "message": "Unauthorized. Admin rights required."}), 403
+
+    data = request.json or {}
+    target_email = data.get("email", "").lower().strip()
+    action = data.get("action", "add")  # "add" or "remove"
+
+    if not target_email or not target_email.endswith(f"@{ALLOWED_DOMAIN}"):
+        return jsonify({"success": False, "message": f"Invalid email. Must be an active @{ALLOWED_DOMAIN} address."}), 400
+
+    admins = get_admin_emails()
+    if action == "add":
+        if target_email not in admins:
+            admins.append(target_email)
+            save_admin_emails(admins)
+        return jsonify({"success": True, "message": f"Admin access successfully granted to {target_email}.", "admins": admins})
+    elif action == "remove":
+        if target_email == DEFAULT_ADMIN.lower():
+            return jsonify({"success": False, "message": "Primary admin (Shahid Ansari) cannot be removed."}), 400
+        admins = [a for a in admins if a != target_email]
+        save_admin_emails(admins)
+        return jsonify({"success": True, "message": f"Admin access removed for {target_email}.", "admins": admins})
+
+    return jsonify({"success": False, "message": "Invalid action."}), 400
 
 
 @app.route("/logout")
@@ -386,7 +443,7 @@ class ScraperManager:
                 "last_run": self.last_completed_run
             }
 
-    def start_scraping(self, urls, max_workers=3, timeout=15, batch_size=20, resume=False, selected_fields=None, is_manual=False, executed_by=""):
+    def start_scraping(self, urls, max_workers=3, timeout=15, batch_size=20, resume=False, selected_fields=None, is_manual=False, user_email="", executed_by=""):
         with self.lock:
             if self.is_running:
                 return False, "Scraper is already running"
@@ -397,6 +454,7 @@ class ScraperManager:
             self.timeout = timeout
             self.batch_size = batch_size
             self.selected_fields = selected_fields
+            self.user_email = (user_email or "").lower().strip()
             self.executed_by = executed_by or "Bizprospex Member"
             self.completed = 0
             self.success_count = 0
@@ -512,6 +570,7 @@ class ScraperManager:
                     self.fail_count,
                     self.selected_fields,
                     records_to_save,
+                    user_email=getattr(self, "user_email", ""),
                     executed_by=getattr(self, "executed_by", "Bizprospex Member")
                 )
                 with self.lock:
@@ -529,6 +588,9 @@ manager = ScraperManager()
 
 @app.route("/")
 def index():
+    user = session.get("user", {})
+    user_email = user.get("email", "").lower().strip()
+    is_admin = is_user_admin(user_email)
     input_count = 0
     if os.path.exists(INPUT_FILE):
         try:
@@ -538,7 +600,7 @@ def index():
         except Exception:
             pass
 
-    return render_template("index.html", input_file=INPUT_FILE, input_count=input_count)
+    return render_template("index.html", input_file=INPUT_FILE, input_count=input_count, is_admin=is_admin)
 
 
 @app.route("/api/status")
@@ -574,7 +636,8 @@ def api_start():
         return jsonify({"success": False, "message": "No URLs found to scrape."}), 400
 
     user = session.get("user", {})
-    user_label = user.get("name") or user.get("email") or "Bizprospex Member"
+    user_email = user.get("email", "").lower().strip()
+    user_label = user.get("name") or user_email.split("@")[0]
 
     ok, msg = manager.start_scraping(
         urls,
@@ -584,6 +647,7 @@ def api_start():
         resume=False,
         selected_fields=selected_fields,
         is_manual=is_manual,
+        user_email=user_email,
         executed_by=user_label
     )
     if ok:
@@ -655,21 +719,40 @@ def api_upload():
 
 
 # ==============================
-# RUN HISTORY API ROUTES
+# RUN HISTORY API ROUTES (PER-USER ISOLATED)
 # ==============================
 
 @app.route("/api/history")
 def api_history():
+    user = session.get("user", {})
+    user_email = user.get("email", "").lower().strip()
+    is_admin = is_user_admin(user_email)
     history = load_history()
-    return jsonify({"history": history})
+
+    # Strict Data Isolation: Users only see their own scraping runs
+    user_runs = [r for r in history if r.get("user_email", "").lower().strip() == user_email]
+
+    return jsonify({
+        "success": True,
+        "history": user_runs,
+        "is_admin": is_admin
+    })
 
 
 @app.route("/api/history/<run_id>/download/<file_type>")
 def api_download_history_file(run_id, file_type):
+    user = session.get("user", {})
+    user_email = user.get("email", "").lower().strip()
+    is_admin = is_user_admin(user_email)
+
     history = load_history()
     run = next((r for r in history if r.get("id") == run_id), None)
     if not run:
         return jsonify({"error": "Run not found"}), 404
+
+    # Security check: User must own the run or be an admin
+    if run.get("user_email", "").lower().strip() != user_email and not is_admin:
+        return jsonify({"error": "Unauthorized access to this run"}), 403
 
     if file_type.lower() == "excel":
         file_path = os.path.join(EXPORTS_DIR, run.get("excel_file", f"{run_id}.xlsx"))
@@ -685,6 +768,19 @@ def api_download_history_file(run_id, file_type):
 
 @app.route("/api/history/<run_id>/records")
 def api_history_records(run_id):
+    user = session.get("user", {})
+    user_email = user.get("email", "").lower().strip()
+    is_admin = is_user_admin(user_email)
+
+    history = load_history()
+    run = next((r for r in history if r.get("id") == run_id), None)
+    if not run:
+        return jsonify({"error": "Run not found"}), 404
+
+    # Security check: User must own the run or be an admin
+    if run.get("user_email", "").lower().strip() != user_email and not is_admin:
+        return jsonify({"error": "Unauthorized access to this run"}), 403
+
     csv_path = os.path.join(EXPORTS_DIR, f"{run_id}.csv")
     excel_path = os.path.join(EXPORTS_DIR, f"{run_id}.xlsx")
     rows = []
@@ -707,7 +803,19 @@ def api_history_records(run_id):
 
 @app.route("/api/history/<run_id>/delete", methods=["POST"])
 def api_history_delete(run_id):
+    user = session.get("user", {})
+    user_email = user.get("email", "").lower().strip()
+    is_admin = is_user_admin(user_email)
+
     history = load_history()
+    run = next((r for r in history if r.get("id") == run_id), None)
+    if not run:
+        return jsonify({"error": "Run not found"}), 404
+
+    # Security check: User must own the run or be an admin
+    if run.get("user_email", "").lower().strip() != user_email and not is_admin:
+        return jsonify({"error": "Unauthorized access to this run"}), 403
+
     updated = [r for r in history if r.get("id") != run_id]
     save_history(updated)
 

@@ -12,6 +12,8 @@
       "Employee Count",
       "Founded"
     ],
+    "user_email": "shahid@bizprospex.com",
+    "executed_by": "Shahid Ansari",
     "excel_file": "run_20261119_164619.xlsx",
     "csv_file": "run_20261119_164619.csv"
   },
@@ -27,6 +29,8 @@
       "Website",
       "Industry"
     ],
+    "user_email": "shahid@bizprospex.com",
+    "executed_by": "Shahid Ansari",
     "excel_file": "run_20261119_163646.xlsx",
     "csv_file": "run_20261119_163646.csv"
   }
