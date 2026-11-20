@@ -509,7 +509,7 @@ class ScraperManager:
                 "latest_items": latest,
                 "total_session_items": len(self.session_records),
                 "last_run": self.last_completed_run,
-                "input_urls": list(self.all_urls) if self.is_running else [],
+                "input_urls": list(self.all_urls) if (self.is_running or (self.is_paused and len(self.remaining_urls) > 0)) else [],
                 "selected_fields": self.selected_fields
             }
 
@@ -857,6 +857,10 @@ def api_resume():
     user = session.get("user", {})
     user_email = user.get("email", "").lower().strip()
     mgr = get_user_manager(user_email)
+    data = request.json or {}
+    fields = data.get("fields")
+    if fields:
+        mgr.selected_fields = fields
     ok, msg = mgr.resume_scraping()
     if ok:
         return jsonify({"success": True, "message": msg})
