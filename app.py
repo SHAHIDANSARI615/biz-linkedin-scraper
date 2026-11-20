@@ -460,8 +460,8 @@ class ScraperManager:
         self.active_run_id = ""
         self.source_name = ""
         self.batch_size = 20
-        self.max_workers = 3
-        self.timeout = 15
+        self.max_workers = 5
+        self.timeout = 10
         self.selected_fields = None
         self.last_completed_run = None
 
@@ -504,7 +504,7 @@ class ScraperManager:
                 "last_run": self.last_completed_run
             }
 
-    def start_scraping(self, urls, max_workers=3, timeout=15, batch_size=20, resume=False, selected_fields=None, is_manual=False, user_email="", executed_by=""):
+    def start_scraping(self, urls, max_workers=5, timeout=10, batch_size=20, resume=False, selected_fields=None, is_manual=False, user_email="", executed_by=""):
         with self.lock:
             if self.is_running:
                 return False, "Scraper is already running for your account"
@@ -612,8 +612,8 @@ class ScraperManager:
                 self.is_running = False
             return
 
-        # Max 3 workers for cloud stability & rate limit prevention
-        worker_count = min(max(1, self.max_workers), 3)
+        # Max 6 workers for high performance & safe rate-limit throughput
+        worker_count = min(max(1, self.max_workers), 6)
 
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=worker_count)
         try:
@@ -789,8 +789,8 @@ def api_status():
 @app.route("/api/start", methods=["POST"])
 def api_start():
     data = request.json or {}
-    workers = int(data.get("workers", 3))
-    timeout = int(data.get("timeout", 15))
+    workers = int(data.get("workers", 5))
+    timeout = int(data.get("timeout", 10))
     batch_size = int(data.get("batch_size", 20))
     selected_fields = data.get("fields", None)
 

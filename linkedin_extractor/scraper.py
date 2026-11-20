@@ -32,8 +32,16 @@ import json
 import threading
 import argparse
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from typing import Dict, Any, List
 from urllib.parse import urlparse
+
+# High-performance persistent session with connection pooling
+HTTP_SESSION = requests.Session()
+_adapter = HTTPAdapter(pool_connections=50, pool_maxsize=50, max_retries=Retry(total=1, backoff_factor=0.2))
+HTTP_SESSION.mount("https://", _adapter)
+HTTP_SESSION.mount("http://", _adapter)
 
 try:
     from bs4 import BeautifulSoup
@@ -139,11 +147,39 @@ def parse_count(val: Any) -> Any:
     return val
 
 
+def extract_associated_members(text: str) -> Any:
+    """Extract associated member / employee count from any text or HTML snippet."""
+    if not text:
+        return ""
+    patterns = [
+        r'([\d,]+)\s*(?:associated\s*members?|employees?\s*on\s*LinkedIn|members?\s*on\s*LinkedIn)',
+        r'(?:associated\s*members?|employees?\s*on\s*LinkedIn|members?\s*on\s*LinkedIn)[\s:]*([0-9,]+)',
+        r'(?:discover|view|see)\s+(?:all\s+)?([\d,]+)\s+employees?',
+        r'([\d,]+)\s*current\s*employees?',
+        r'([\d,]+)\s*people\s*on\s*LinkedIn',
+        r'associated\s*members?[:\s]+([\d,]+)',
+        r'([\d,]+)\s*associated',
+        r'>\s*([\d,]+)\s*<\/[^>]+>\s*(?:associated\s*members?|employees?\s*on\s*LinkedIn)',
+        r'(?:associated\s*members?|employees?\s*on\s*LinkedIn)\s*<\/[^>]+>\s*<\w+[^>]*>\s*([\d,]+)',
+    ]
+    for pat in patterns:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            val = parse_count(m.group(1))
+            if val and val != "":
+                return val
+    return ""
+
+
 def _enrich_result(info: Dict[str, Any]) -> Dict[str, Any]:
     """Add employees_min/max from company_size, ensure all keys exist."""
     emp_min, emp_max = parse_size(info.get("company_size", ""))
     info["employees_min"] = emp_min
     info["employees_max"] = emp_max
+    if not info.get("employee_count") and info.get("company_size"):
+        assoc = extract_associated_members(str(info["company_size"]))
+        if assoc:
+            info["employee_count"] = assoc
     if "employee_count" in info and info["employee_count"] != "":
         info["employee_count"] = parse_count(info["employee_count"])
     for key in ("name", "description", "website", "industry", "company_size",
@@ -187,9 +223,9 @@ def _try_googlebot(url: str, timeout: int) -> Dict[str, Any]:
         "Accept-Language": "en-US,en;q=0.5",
     }
     try:
-        connect_t = min(4, timeout)
-        read_t = min(timeout, 8)
-        resp = requests.get(url, headers=headers, timeout=(connect_t, read_t), allow_redirects=True)
+        connect_t = min(3, timeout)
+        read_t = min(timeout, 6)
+        resp = HTTP_SESSION.get(url, headers=headers, timeout=(connect_t, read_t), allow_redirects=True)
         if resp.status_code == 404:
             return {"success": False, "error": "Page not found (404)",
                     "linkedin_url": url, "_is_404": True}
@@ -214,6 +250,8 @@ def _try_googlebot(url: str, timeout: int) -> Dict[str, Any]:
                       "employee_count", "headquarters", "founded", "followers"):
                 val = info_jsonld.get(k) or info_html.get(k) or ""
                 merged[k] = val
+            if not merged.get("employee_count"):
+                merged["employee_count"] = extract_associated_members(html)
             merged = _enrich_result(merged)
             if _has_useful_data(merged):
                 return merged
@@ -368,6 +406,15 @@ def _parse_html(html: str, linkedin_url: str) -> Dict[str, Any]:
             info["industry"] = value
         elif label == "company size":
             info["company_size"] = value
+            for extra_label in labels[1:]:
+                assoc = extract_associated_members(extra_label.get_text(strip=True))
+                if assoc:
+                    info["employee_count"] = assoc
+                    break
+            if not info.get("employee_count"):
+                assoc = extract_associated_members(block.get_text(" ", strip=True))
+                if assoc:
+                    info["employee_count"] = assoc
         elif label == "headquarters":
             info["headquarters"] = value
         elif label == "founded":
@@ -375,16 +422,15 @@ def _parse_html(html: str, linkedin_url: str) -> Dict[str, Any]:
 
     # Extract employee count / associate members from HTML if not present
     if not info.get("employee_count"):
-        for el in soup.find_all(["a", "span", "div", "h2", "h3", "p"]):
+        for el in soup.find_all(["a", "span", "div", "h2", "h3", "p", "li"]):
             text = el.get_text(" ", strip=True)
-            m_emp = re.search(r'(?:discover|view|see)\s+all\s+([\d,]+)\s+employees', text, re.IGNORECASE)
-            if m_emp:
-                info["employee_count"] = parse_count(m_emp.group(1))
+            assoc = extract_associated_members(text)
+            if assoc:
+                info["employee_count"] = assoc
                 break
-            m_assoc = re.search(r'([\d,]+)\s*(?:associated members?|on LinkedIn|employees on LinkedIn)', text, re.IGNORECASE)
-            if m_assoc:
-                info["employee_count"] = parse_count(m_assoc.group(1))
-                break
+
+    if not info.get("employee_count"):
+        info["employee_count"] = extract_associated_members(html)
 
     if not info.get("website"):
         for a in soup.select('a[href]'):
@@ -410,9 +456,9 @@ def _try_jina(url: str, timeout: int) -> Dict[str, Any]:
         "X-Timeout": str(timeout),
     }
     try:
-        connect_t = min(4, timeout)
-        read_t = min(timeout, 8)
-        resp = requests.get(jina_url, headers=headers, timeout=(connect_t, read_t))
+        connect_t = min(3, timeout)
+        read_t = min(timeout, 6)
+        resp = HTTP_SESSION.get(jina_url, headers=headers, timeout=(connect_t, read_t))
         if resp.status_code != 200:
             return {"success": False, "error": f"Jina HTTP {resp.status_code}",
                     "linkedin_url": url}
@@ -479,6 +525,9 @@ def _parse_markdown(content: str, linkedin_url: str) -> Dict[str, Any]:
     if m_emp:
         count_str = m_emp.group(1) or m_emp.group(2) or m_emp.group(3)
         info["employee_count"] = parse_count(count_str)
+
+    if not info.get("employee_count"):
+        info["employee_count"] = extract_associated_members(content)
 
     m = re.search(r'Headquarters\s+(.+?)(?:\n|$)', content)
     if m:
@@ -570,6 +619,8 @@ def _try_playwright(url: str, timeout: int) -> Dict[str, Any]:
                       "employee_count", "headquarters", "founded", "followers"):
                 val = info_jsonld.get(k) or info_html.get(k) or ""
                 merged[k] = val
+            if not merged.get("employee_count"):
+                merged["employee_count"] = extract_associated_members(html)
             merged = _enrich_result(merged)
             if _has_useful_data(merged):
                 return merged
