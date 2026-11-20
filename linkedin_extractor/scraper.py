@@ -582,9 +582,10 @@ def _try_playwright(url: str, timeout: int) -> Dict[str, Any]:
         return {"success": False, "error": f"Playwright error: {err_msg}",
                 "linkedin_url": url}
     finally:
-        PLAYWRIGHT_LOCK.release()
-        return {"success": False, "error": f"Playwright error: {err_msg}",
-                "linkedin_url": url}
+        try:
+            PLAYWRIGHT_LOCK.release()
+        except RuntimeError:
+            pass
 
 
 # ── Main scraper class ──────────────────────────────────────────────────────

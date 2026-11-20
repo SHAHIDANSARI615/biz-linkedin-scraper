@@ -442,7 +442,7 @@ def add_run_to_history(run_id, source_name, total, extracted, failed, fields, re
 class ScraperManager:
     def __init__(self, user_email=""):
         self.user_email = (user_email or "").lower().strip()
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
         self.thread = None
         self.is_running = False
         self.is_paused = False
@@ -485,8 +485,7 @@ class ScraperManager:
             can_resume = bool(
                 not self.is_running
                 and rem_count > 0
-                and self.completed > 0
-                and self.completed < self.total
+                and self.is_paused
             )
             return {
                 "is_running": self.is_running,
@@ -551,8 +550,9 @@ class ScraperManager:
             self.is_running = False
             self.is_paused = True
             self.current_url = ""
-            self.add_log("Stop requested by user. Pausing session immediately...", "warning")
-            return True, "Scraper stopped"
+
+        self.add_log("Stop requested by user. Pausing session immediately...", "warning")
+        return True, "Scraper stopped"
 
     def resume_scraping(self):
         with self.lock:
@@ -631,8 +631,8 @@ class ScraperManager:
 
             while futures:
                 with self.lock:
-                    if self.should_stop:
-                        self.add_log("Stop confirmed. Stopping remaining tasks safely...", "warning")
+                    stopping = self.should_stop
+                    if stopping:
                         for f in list(futures.keys()):
                             f.cancel()
                         break
@@ -745,7 +745,7 @@ class ScraperManager:
 
 # Multi-User Isolated Managers
 USER_MANAGERS = {}
-managers_lock = threading.Lock()
+managers_lock = threading.RLock()
 
 
 def get_user_manager(email):

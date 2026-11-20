@@ -962,11 +962,14 @@
         btnStop.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Stopping...`;
       }
       try {
-        await fetch('/api/stop', { method: 'POST' });
-        await updateStatus();
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        await fetch('/api/stop', { method: 'POST', signal: controller.signal });
+        clearTimeout(timeoutId);
       } catch (e) {
-        console.error(e);
-        updateStatus();
+        console.error("Stop error:", e);
+      } finally {
+        setTimeout(updateStatus, 300);
       }
     }
 
