@@ -4,7 +4,7 @@ import time
 import re
 import json
 import threading
-from datetime import timedelta
+from datetime import datetime, timezone, timedelta
 import pandas as pd
 import requests
 from flask import Flask, render_template, request, jsonify, send_file, session, redirect, url_for, send_from_directory
@@ -22,6 +22,14 @@ app = Flask(__name__, static_folder="static")
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "biz-linkedin-scraper-secret-2026")
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50MB max upload
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=48)
+
+IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def get_ist_now_str(fmt="%d %b %Y, %I:%M %p"):
+    """Format current time strictly in Indian Standard Time (IST, UTC+5:30)."""
+    return datetime.now(IST).strftime(fmt)
+
 
 ALLOWED_DOMAIN = "bizprospex.com"
 
@@ -134,7 +142,7 @@ def record_login_audit(email):
                 events = []
         event = {
             "email": email,
-            "time": time.strftime("%d %b %Y, %I:%M %p"),
+            "time": get_ist_now_str("%d %b %Y, %I:%M %p"),
         }
         events.insert(0, event)
         events = events[:500]
@@ -386,7 +394,7 @@ def add_run_to_history(run_id, source_name, total, extracted, failed, fields, re
 
     entry = {
         "id": run_id,
-        "timestamp": time.strftime("%d %b %Y, %I:%M %p"),
+        "timestamp": get_ist_now_str("%d %b %Y, %I:%M %p"),
         "source": source_name,
         "total": total,
         "extracted": extracted,
@@ -403,7 +411,8 @@ def add_run_to_history(run_id, source_name, total, extracted, failed, fields, re
 
 
 class ScraperManager:
-    def __init__(self):
+    def __init__(self, user_email=""):
+        self.user_email = (user_email or "").lower().strip()
         self.lock = threading.Lock()
         self.thread = None
         self.is_running = False
@@ -421,8 +430,12 @@ class ScraperManager:
         self.selected_fields = None
         self.last_completed_run = None
 
+        safe_prefix = re.sub(r"[^a-zA-Z0-9_]", "_", self.user_email) or "default"
+        self.user_output_xlsx = os.path.join(EXPORTS_DIR, f"current_{safe_prefix}.xlsx")
+        self.user_output_csv = os.path.join(EXPORTS_DIR, f"current_{safe_prefix}.csv")
+
     def add_log(self, msg, level="info"):
-        timestamp = time.strftime("%H:%M:%S")
+        timestamp = get_ist_now_str("%H:%M:%S")
         log_entry = {"time": timestamp, "msg": msg, "level": level}
         with self.lock:
             self.logs.append(log_entry)
@@ -450,7 +463,7 @@ class ScraperManager:
     def start_scraping(self, urls, max_workers=3, timeout=15, batch_size=20, resume=False, selected_fields=None, is_manual=False, user_email="", executed_by=""):
         with self.lock:
             if self.is_running:
-                return False, "Scraper is already running"
+                return False, "Scraper is already running for your account"
 
             self.is_running = True
             self.should_stop = False
@@ -458,8 +471,8 @@ class ScraperManager:
             self.timeout = timeout
             self.batch_size = batch_size
             self.selected_fields = selected_fields
-            self.user_email = (user_email or "").lower().strip()
-            self.executed_by = executed_by or "Bizprospex Member"
+            self.user_email = (user_email or self.user_email or "").lower().strip()
+            self.executed_by = executed_by or "Team Member"
             self.completed = 0
             self.success_count = 0
             self.fail_count = 0
@@ -486,8 +499,8 @@ class ScraperManager:
 
     def _run_bulk(self, all_urls, resume, is_manual):
         pending_urls = list(dict.fromkeys(all_urls))  # deduplicate preserving order
-        run_id = f"run_{time.strftime('%Y%m%d_%H%M%S')}"
-        source_name = f"Pasted URLs ({len(pending_urls)})" if is_manual else f"{INPUT_FILE} ({len(pending_urls)} URLs)"
+        run_id = f"run_{get_ist_now_str('%Y%m%d_%H%M%S')}"
+        source_name = f"Pasted URLs ({len(pending_urls)})" if is_manual else f"Excel File ({len(pending_urls)} URLs)"
 
         with self.lock:
             self.total = len(pending_urls)
@@ -576,11 +589,11 @@ class ScraperManager:
 
                         self.add_log(msg, lvl)
 
-                        # Auto-save every 5 URLs
+                        # Auto-save every 5 URLs to user's dedicated file
                         if self.completed % 5 == 0:
                             with self.lock:
                                 recs_to_save = list(self.session_records)
-                            safe_save(recs_to_save, OUTPUT_FILE, OUTPUT_CSV)
+                            safe_save(recs_to_save, self.user_output_xlsx, self.user_output_csv)
 
                         # Submit next URL if not requested to stop
                         with self.lock:
@@ -602,7 +615,7 @@ class ScraperManager:
                 self.is_running = False
                 self.current_url = ""
 
-            safe_save(records_to_save, OUTPUT_FILE, OUTPUT_CSV)
+            safe_save(records_to_save, self.user_output_xlsx, self.user_output_csv)
 
             # Record run in persistent history with dedicated files
             if records_to_save:
@@ -615,7 +628,7 @@ class ScraperManager:
                     self.selected_fields,
                     records_to_save,
                     user_email=getattr(self, "user_email", ""),
-                    executed_by=getattr(self, "executed_by", "Bizprospex Member")
+                    executed_by=getattr(self, "executed_by", "Team Member")
                 )
                 with self.lock:
                     self.last_completed_run = run_entry
@@ -623,7 +636,18 @@ class ScraperManager:
             self.add_log(f"Scraping run completed! {len(records_to_save)} records saved cleanly in Run History.", "success")
 
 
-manager = ScraperManager()
+# Multi-User Isolated Managers
+USER_MANAGERS = {}
+managers_lock = threading.Lock()
+
+
+def get_user_manager(email):
+    """Retrieve or create an isolated scraper manager per user."""
+    clean_email = (email or "default").lower().strip()
+    with managers_lock:
+        if clean_email not in USER_MANAGERS:
+            USER_MANAGERS[clean_email] = ScraperManager(clean_email)
+        return USER_MANAGERS[clean_email]
 
 
 # ==============================
@@ -649,7 +673,10 @@ def index():
 
 @app.route("/api/status")
 def api_status():
-    return jsonify(manager.get_status())
+    user = session.get("user", {})
+    user_email = user.get("email", "").lower().strip()
+    mgr = get_user_manager(user_email)
+    return jsonify(mgr.get_status())
 
 
 @app.route("/api/start", methods=["POST"])
@@ -682,8 +709,9 @@ def api_start():
     user = session.get("user", {})
     user_email = user.get("email", "").lower().strip()
     user_label = user.get("name") or user_email.split("@")[0]
+    mgr = get_user_manager(user_email)
 
-    ok, msg = manager.start_scraping(
+    ok, msg = mgr.start_scraping(
         urls,
         max_workers=workers,
         timeout=timeout,
@@ -701,7 +729,10 @@ def api_start():
 
 @app.route("/api/stop", methods=["POST"])
 def api_stop():
-    ok, msg = manager.stop_scraping()
+    user = session.get("user", {})
+    user_email = user.get("email", "").lower().strip()
+    mgr = get_user_manager(user_email)
+    ok, msg = mgr.stop_scraping()
     return jsonify({"success": ok, "message": msg})
 
 
@@ -773,15 +804,14 @@ def api_history():
     is_admin = is_user_admin(user_email)
     history = load_history()
 
-    # Admin can view all runs; regular team members view their own runs
-    if is_admin:
-        runs_to_show = history
-    else:
-        runs_to_show = [
-            r for r in history
-            if r.get("user_email", "").lower().strip() == user_email
-            or (not r.get("user_email") and user_email in r.get("executed_by", "").lower())
-        ]
+    # STRICT PRIVACY & MULTI-TENANT ISOLATION:
+    # Every user (including admin) sees ONLY their own scraping runs in their history table.
+    # Admin privileges are dedicated to viewing Login Activity and managing roles in the Admin Console.
+    runs_to_show = [
+        r for r in history
+        if r.get("user_email", "").lower().strip() == user_email
+        or (not r.get("user_email") and user_email in r.get("executed_by", "").lower())
+    ]
 
     return jsonify({
         "success": True,
@@ -883,15 +913,23 @@ def api_history_delete(run_id):
 
 @app.route("/api/download/excel")
 def download_excel():
-    if os.path.exists(OUTPUT_FILE):
-        return send_file(OUTPUT_FILE, as_attachment=True, download_name="Biz_LinkedIn_Companies.xlsx")
+    user = session.get("user", {})
+    user_email = user.get("email", "").lower().strip()
+    mgr = get_user_manager(user_email)
+    target = mgr.user_output_xlsx if os.path.exists(mgr.user_output_xlsx) else OUTPUT_FILE
+    if os.path.exists(target):
+        return send_file(target, as_attachment=True, download_name="Biz_LinkedIn_Companies.xlsx")
     return jsonify({"error": "No output file found"}), 404
 
 
 @app.route("/api/download/csv")
 def download_csv():
-    if os.path.exists(OUTPUT_CSV):
-        return send_file(OUTPUT_CSV, as_attachment=True, download_name="Biz_LinkedIn_Companies.csv")
+    user = session.get("user", {})
+    user_email = user.get("email", "").lower().strip()
+    mgr = get_user_manager(user_email)
+    target = mgr.user_output_csv if os.path.exists(mgr.user_output_csv) else OUTPUT_CSV
+    if os.path.exists(target):
+        return send_file(target, as_attachment=True, download_name="Biz_LinkedIn_Companies.csv")
     return jsonify({"error": "No CSV file found"}), 404
 
 
