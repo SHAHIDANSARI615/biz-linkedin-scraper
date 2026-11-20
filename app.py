@@ -434,7 +434,14 @@ def add_run_to_history(run_id, source_name, total, extracted, failed, fields, re
         "excel_file": excel_name,
         "csv_file": csv_name
     }
-    history.insert(0, entry)
+    
+    # Check if run_id already exists in history. If so, update it; otherwise prepend.
+    existing_idx = next((i for i, r in enumerate(history) if r.get("id") == run_id), None)
+    if existing_idx is not None:
+        history[existing_idx] = entry
+    else:
+        history.insert(0, entry)
+
     save_history(history)
     return entry
 
@@ -501,7 +508,9 @@ class ScraperManager:
                 "logs": list(self.logs),
                 "latest_items": latest,
                 "total_session_items": len(self.session_records),
-                "last_run": self.last_completed_run
+                "last_run": self.last_completed_run,
+                "input_urls": list(self.all_urls) if (self.is_running or self.is_paused or self.total > 0) else [],
+                "selected_fields": self.selected_fields
             }
 
     def start_scraping(self, urls, max_workers=5, timeout=10, batch_size=20, resume=False, selected_fields=None, is_manual=False, user_email="", executed_by=""):
@@ -721,8 +730,8 @@ class ScraperManager:
 
             safe_save(records_to_save, self.user_output_xlsx, self.user_output_csv)
 
-            # Record run in persistent history with dedicated files
-            if records_to_save:
+            # Record run in persistent history ONLY when fully finished (never when paused/stopped midway)
+            if records_to_save and not was_stopped:
                 run_entry = add_run_to_history(
                     self.active_run_id,
                     self.source_name,

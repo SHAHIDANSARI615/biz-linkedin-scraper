@@ -218,7 +218,7 @@
             </div>
           </div>
 
-          <textarea id="urlPasterBox" rows="6" oninput="parsePastedUrls()" placeholder="Paste URLs here, e.g.:&#10;https://www.linkedin.com/company/stripe&#10;https://www.linkedin.com/company/google&#10;https://www.linkedin.com/company/microsoft" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs font-mono text-slate-800 focus:bg-white focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition leading-relaxed"></textarea>
+          <textarea id="urlPasterBox" rows="6" oninput="onUrlInputChanged()" placeholder="Paste URLs here, e.g.:&#10;https://www.linkedin.com/company/stripe&#10;https://www.linkedin.com/company/google&#10;https://www.linkedin.com/company/microsoft" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs font-mono text-slate-800 focus:bg-white focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition leading-relaxed"></textarea>
           
           <p class="text-[11px] text-slate-500 flex items-center gap-1.5">
             <i class="fa-solid fa-circle-info text-sky-500"></i> You can paste 1 single URL, 10 URLs, or thousands of URLs directly into this box without touching Excel!
@@ -704,7 +704,15 @@
       }
     }
 
-    // Parse Pasted URLs
+    // Parse Pasted URLs & Save State
+    function onUrlInputChanged() {
+      parsePastedUrls();
+      try {
+        const text = document.getElementById('urlPasterBox').value;
+        localStorage.setItem('biz_pasted_urls', text);
+      } catch (e) {}
+    }
+
     function parsePastedUrls() {
       const text = document.getElementById('urlPasterBox').value;
       const rawLines = text.split(/[\r\n,;\s]+/);
@@ -741,11 +749,17 @@
         "https://www.linkedin.com/company/verobotics"
       ].join('\n');
       document.getElementById('urlPasterBox').value = samples;
+      try {
+        localStorage.setItem('biz_pasted_urls', samples);
+      } catch (e) {}
       parsePastedUrls();
     }
 
     function clearUrlPaster() {
       document.getElementById('urlPasterBox').value = '';
+      try {
+        localStorage.removeItem('biz_pasted_urls');
+      } catch (e) {}
       parsePastedUrls();
     }
 
@@ -780,8 +794,19 @@
         document.getElementById('kpiSuccess').innerText = data.success_count;
         document.getElementById('kpiFailed').innerText = data.fail_count;
 
-        if (isRunning || currentInputMode === 'file') {
-          if (data.total > 0) document.getElementById('kpiTotal').innerText = data.total;
+        if (data.total > 0) {
+          document.getElementById('kpiTotal').innerText = data.total;
+        } else if (currentInputMode === 'paste' && !isRunning) {
+          document.getElementById('kpiTotal').innerText = detectedUrls.length;
+        }
+
+        // Auto-restore URLs into input box if empty and backend has active/paused run URLs
+        if (data.input_urls && data.input_urls.length > 0) {
+          const box = document.getElementById('urlPasterBox');
+          if (box && !box.value.trim()) {
+            box.value = data.input_urls.join('\n');
+            parsePastedUrls();
+          }
         }
 
         document.getElementById('progressText').innerText = `${data.completed} / ${data.total} (${data.percent}%)`;
@@ -849,8 +874,8 @@
               showCompletionBanner(`Scraper paused: ${data.completed} completed, ${data.remaining_count} remaining. Click Resume anytime!`);
             } else {
               showCompletionBanner(`Run completed with ${data.success_count} successful and ${data.fail_count} failed records. Saved in Run History.`);
+              loadHistoryTable();
             }
-            loadHistoryTable();
           }
         }
 
@@ -1385,10 +1410,24 @@
         .replace(/'/g, "&#039;");
     }
 
-    window.addEventListener('DOMContentLoaded', () => {
+    function initAppState() {
+      try {
+        const cached = localStorage.getItem('biz_pasted_urls');
+        const box = document.getElementById('urlPasterBox');
+        if (cached && box && !box.value.trim()) {
+          box.value = cached;
+          parsePastedUrls();
+        }
+      } catch (e) {}
       startPolling();
-      parsePastedUrls();
-    });
+      updateStatus();
+    }
+
+    if (document.readyState === 'loading') {
+      window.addEventListener('DOMContentLoaded', initAppState);
+    } else {
+      initAppState();
+    }
   </script>
 </body>
 </html>
