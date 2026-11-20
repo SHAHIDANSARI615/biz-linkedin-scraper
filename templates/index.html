@@ -218,7 +218,7 @@
             </div>
           </div>
 
-          <textarea id="urlPasterBox" rows="6" oninput="onUrlInputChanged()" placeholder="Paste URLs here, e.g.:&#10;https://www.linkedin.com/company/stripe&#10;https://www.linkedin.com/company/google&#10;https://www.linkedin.com/company/microsoft" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs font-mono text-slate-800 focus:bg-white focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition leading-relaxed"></textarea>
+          <textarea id="urlPasterBox" rows="6" oninput="parsePastedUrls()" placeholder="Paste URLs here, e.g.:&#10;https://www.linkedin.com/company/stripe&#10;https://www.linkedin.com/company/google&#10;https://www.linkedin.com/company/microsoft" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs font-mono text-slate-800 focus:bg-white focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition leading-relaxed"></textarea>
           
           <p class="text-[11px] text-slate-500 flex items-center gap-1.5">
             <i class="fa-solid fa-circle-info text-sky-500"></i> You can paste 1 single URL, 10 URLs, or thousands of URLs directly into this box without touching Excel!
@@ -704,15 +704,7 @@
       }
     }
 
-    // Parse Pasted URLs & Save State
-    function onUrlInputChanged() {
-      parsePastedUrls();
-      try {
-        const text = document.getElementById('urlPasterBox').value;
-        localStorage.setItem('biz_pasted_urls', text);
-      } catch (e) {}
-    }
-
+    // Parse Pasted URLs
     function parsePastedUrls() {
       const text = document.getElementById('urlPasterBox').value;
       const rawLines = text.split(/[\r\n,;\s]+/);
@@ -749,9 +741,6 @@
         "https://www.linkedin.com/company/verobotics"
       ].join('\n');
       document.getElementById('urlPasterBox').value = samples;
-      try {
-        localStorage.setItem('biz_pasted_urls', samples);
-      } catch (e) {}
       parsePastedUrls();
     }
 
@@ -800,8 +789,10 @@
           document.getElementById('kpiTotal').innerText = detectedUrls.length;
         }
 
-        // Auto-restore URLs into input box if empty and backend has active/paused run URLs
-        if (data.input_urls && data.input_urls.length > 0) {
+        // ONLY if scraping is actively running AND the box is empty (e.g. user refreshed while scraping was active):
+        // restore the URLs of the active scrape run so they see their running batch intact.
+        // If scraping is NOT running (idle/completed), NEVER auto-populate or touch the box!
+        if (isRunning && data.input_urls && data.input_urls.length > 0) {
           const box = document.getElementById('urlPasterBox');
           if (box && !box.value.trim()) {
             box.value = data.input_urls.join('\n');
@@ -1412,15 +1403,10 @@
 
     function initAppState() {
       try {
-        const cached = localStorage.getItem('biz_pasted_urls');
-        const box = document.getElementById('urlPasterBox');
-        if (cached && box && !box.value.trim()) {
-          box.value = cached;
-          parsePastedUrls();
-        }
+        localStorage.removeItem('biz_pasted_urls');
       } catch (e) {}
       startPolling();
-      updateStatus();
+      parsePastedUrls();
     }
 
     if (document.readyState === 'loading') {

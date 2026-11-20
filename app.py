@@ -509,7 +509,7 @@ class ScraperManager:
                 "latest_items": latest,
                 "total_session_items": len(self.session_records),
                 "last_run": self.last_completed_run,
-                "input_urls": list(self.all_urls) if (self.is_running or self.is_paused or self.total > 0) else [],
+                "input_urls": list(self.all_urls) if self.is_running else [],
                 "selected_fields": self.selected_fields
             }
 
