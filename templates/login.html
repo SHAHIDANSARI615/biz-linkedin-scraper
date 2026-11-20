@@ -3,84 +3,62 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sign In — Biz Linkedin Scraper (Bizprospex)</title>
-  <!-- Custom Brand Favicon -->
+  <title>Sign In — Biz Linkedin Scraper</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     body {
-      background: radial-gradient(circle at 50% 15%, #e0f2fe 0%, #f8fafc 70%);
+      background: radial-gradient(circle at 50% 15%, #f0f9ff 0%, #f8fafc 70%);
     }
   </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4 font-sans text-slate-800 antialiased selection:bg-sky-500 selection:text-white">
 
-  <div class="max-w-md w-full">
-    <!-- Main Card Container -->
-    <div class="bg-white rounded-3xl shadow-2xl shadow-sky-900/10 border border-slate-200/80 p-8 sm:p-10">
+  <div class="max-w-sm w-full">
+    <!-- Card Container -->
+    <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-200/90 p-8 sm:p-9 text-center">
       
-      <!-- Logo & Branding -->
-      <div class="text-center mb-8">
-        <div class="inline-flex items-center justify-center mb-4">
-          <img src="/static/favicon.svg" alt="Biz Logo" class="w-16 h-16 rounded-2xl shadow-lg shadow-sky-500/25">
+      <!-- Logo & Clean Title -->
+      <div class="mb-8">
+        <div class="inline-flex items-center justify-center mb-3.5">
+          <img src="/static/favicon.svg" alt="Biz Logo" class="w-12 h-12 rounded-xl shadow-md shadow-sky-500/20">
         </div>
-        <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center justify-center gap-1.5">
+        <h1 class="text-2xl font-black text-slate-900 tracking-tight">
           Biz <span class="text-sky-600">Linkedin Scraper</span>
         </h1>
-        <div class="inline-flex items-center gap-1.5 mt-2 px-3 py-1 rounded-full bg-sky-50 border border-sky-200 text-sky-700 text-xs font-bold">
-          <i class="fa-solid fa-shield-halved text-sky-600 text-[11px]"></i>
-          <span>Bizprospex Enterprise Gateway</span>
-        </div>
-        <p class="text-xs text-slate-500 mt-3 leading-relaxed">
-          Sign in with your corporate Google Workspace account to access lead scraping tools & history.
+        <p class="text-xs text-slate-500 mt-2">
+          Sign in to access your company scraper workspace
         </p>
       </div>
 
-      <!-- Error Alert (If Rejected) -->
+      <!-- Error Alert (If Any) -->
       {% if error %}
-      <div class="mb-6 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-3">
-        <i class="fa-solid fa-circle-exclamation text-base mt-0.5 text-red-500 flex-shrink-0"></i>
-        <div>
-          <span class="font-bold">Access Denied:</span>
-          <p class="mt-0.5 text-red-600 leading-relaxed">{{ error }}</p>
-        </div>
+      <div class="mb-6 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2.5 text-left">
+        <i class="fa-solid fa-circle-exclamation text-sm mt-0.5 text-rose-500 flex-shrink-0"></i>
+        <p class="leading-relaxed">{{ error }}</p>
       </div>
       {% endif %}
 
-      <!-- Official Continue with Google Button (ONLY Option) -->
-      <div class="space-y-4">
-        <a href="/login/google" class="w-full flex items-center justify-center gap-3.5 px-6 py-4 rounded-2xl bg-white border-2 border-slate-200 hover:border-sky-500 text-slate-700 hover:text-slate-900 font-bold text-sm shadow-sm hover:shadow-md hover:bg-slate-50/50 transition-all duration-200 group">
-          <!-- Official Google "G" Icon -->
+      <!-- Continue with Google Button -->
+      <div>
+        <a href="/login/google" class="w-full flex items-center justify-center gap-3 px-5 py-3.5 rounded-2xl bg-white border-2 border-slate-200 hover:border-sky-500 text-slate-700 hover:text-slate-900 font-bold text-sm shadow-sm hover:shadow-md transition-all duration-200 group">
           <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
             <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
             <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
           </svg>
-          <span class="text-slate-800 group-hover:text-slate-900">Continue with Google</span>
+          <span>Continue with Google</span>
           <i class="fa-solid fa-arrow-right text-xs text-slate-400 group-hover:text-sky-600 group-hover:translate-x-1 transition-all"></i>
         </a>
       </div>
 
-      <!-- Domain Lock Security Notice -->
-      <div class="mt-8 pt-6 border-t border-slate-100 text-center">
-        <div class="flex items-center justify-center gap-1.5 text-xs text-emerald-700 font-bold mb-1.5">
-          <i class="fa-solid fa-lock text-emerald-600"></i>
-          <span>Only @bizprospex.com Authorized</span>
-        </div>
-        <p class="text-[11px] text-slate-400 leading-relaxed">
-          Access is strictly restricted to active employees with a verified corporate Google account. External email providers are blocked.
-        </p>
-      </div>
-
     </div>
 
-    <!-- Footer Copyright -->
+    <!-- Simple Footer -->
     <p class="text-center text-xs text-slate-400 mt-6 font-medium">
-      &copy; 2026 Bizprospex. All rights reserved.
+      &copy; 2026 Biz Linkedin Scraper
     </p>
   </div>
 

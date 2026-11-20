@@ -4,6 +4,7 @@ import time
 import re
 import json
 import threading
+from datetime import timedelta
 import pandas as pd
 import requests
 from flask import Flask, render_template, request, jsonify, send_file, session, redirect, url_for, send_from_directory
@@ -20,6 +21,7 @@ if hasattr(sys.stdout, "reconfigure"):
 app = Flask(__name__, static_folder="static")
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "biz-linkedin-scraper-secret-2026")
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50MB max upload
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=48)
 
 ALLOWED_DOMAIN = "bizprospex.com"
 
@@ -196,6 +198,7 @@ def login_callback():
         # Successful Login Audit (Records Email and Timestamp)
         record_login_audit(email)
 
+        session.permanent = True
         session["user"] = {
             "email": email,
             "name": user_name,
@@ -372,7 +375,7 @@ def save_history(history):
         print(f"[Warning] History save error: {e}")
 
 
-def add_run_to_history(run_id, source_name, total, extracted, failed, fields, records, executed_by=""):
+def add_run_to_history(run_id, source_name, total, extracted, failed, fields, records, user_email="", executed_by=""):
     history = load_history()
     excel_name = f"{run_id}.xlsx"
     csv_name = f"{run_id}.csv"
@@ -389,7 +392,8 @@ def add_run_to_history(run_id, source_name, total, extracted, failed, fields, re
         "extracted": extracted,
         "failed": failed,
         "fields": fields or ["All Fields"],
-        "executed_by": executed_by or "Bizprospex Team Member",
+        "user_email": (user_email or "").lower().strip(),
+        "executed_by": executed_by or user_email or "Team Member",
         "excel_file": excel_name,
         "csv_file": csv_name
     }
@@ -769,12 +773,19 @@ def api_history():
     is_admin = is_user_admin(user_email)
     history = load_history()
 
-    # Strict Data Isolation: Users only see their own scraping runs
-    user_runs = [r for r in history if r.get("user_email", "").lower().strip() == user_email]
+    # Admin can view all runs; regular team members view their own runs
+    if is_admin:
+        runs_to_show = history
+    else:
+        runs_to_show = [
+            r for r in history
+            if r.get("user_email", "").lower().strip() == user_email
+            or (not r.get("user_email") and user_email in r.get("executed_by", "").lower())
+        ]
 
     return jsonify({
         "success": True,
-        "history": user_runs,
+        "history": runs_to_show,
         "is_admin": is_admin
     })
 
