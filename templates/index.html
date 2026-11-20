@@ -258,10 +258,29 @@
               Scrapes company details using our automated multi-method fallback engine. Each run is saved in Run History.
             </p>
 
-            <div class="space-y-3 pt-1">
-              <button id="btnStart" onclick="startScraping()" class="w-full py-3.5 px-4 rounded-xl font-bold text-white bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600 shadow-md shadow-sky-500/25 flex items-center justify-center gap-2 transition active:scale-[0.99] cursor-pointer">
-                <i class="fa-solid fa-rocket"></i> Start Scraper Now
-              </button>
+            <div class="space-y-2.5 pt-1">
+              <!-- Regular Start Button Container -->
+              <div id="startActionContainer">
+                <button id="btnStart" onclick="startScraping()" class="w-full py-3.5 px-4 rounded-xl font-bold text-white bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600 shadow-md shadow-sky-500/25 flex items-center justify-center gap-2 transition active:scale-[0.99] cursor-pointer">
+                  <i class="fa-solid fa-rocket"></i> Start Scraper Now
+                </button>
+              </div>
+
+              <!-- Resume Scraping Container (Appears when paused / stopped) -->
+              <div id="resumeActionContainer" class="hidden space-y-2">
+                <button id="btnResume" onclick="resumeScraping()" class="w-full py-3.5 px-4 rounded-xl font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 shadow-md shadow-emerald-500/25 flex items-center justify-center gap-2 transition active:scale-[0.99] cursor-pointer">
+                  <i class="fa-solid fa-play"></i> Resume Scraping (<span id="resumeCountText">0</span> Remaining)
+                </button>
+                <div class="flex items-center justify-between px-1 text-xs">
+                  <span class="text-amber-600 font-semibold flex items-center gap-1">
+                    <i class="fa-solid fa-circle-pause"></i> Session Paused
+                  </span>
+                  <button onclick="discardAndStartFresh()" class="text-slate-500 hover:text-rose-600 underline cursor-pointer">
+                    Discard & Start New Run
+                  </button>
+                </div>
+              </div>
+
               <button id="btnStop" onclick="stopScraping()" disabled class="w-full py-3 px-4 rounded-xl font-bold text-slate-400 bg-slate-100 border border-slate-200 flex items-center justify-center gap-2 cursor-not-allowed opacity-60 transition">
                 <i class="fa-solid fa-pause"></i> Stop / Pause Session
               </button>
@@ -776,27 +795,65 @@
         const badge = document.getElementById('statusBadge');
         const btnStart = document.getElementById('btnStart');
         const btnStop = document.getElementById('btnStop');
+        const startContainer = document.getElementById('startActionContainer');
+        const resumeContainer = document.getElementById('resumeActionContainer');
+        const resumeCountText = document.getElementById('resumeCountText');
 
         if (isRunning) {
           badge.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200";
           badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span><span>Scraping Active</span>`;
-          btnStart.disabled = true;
-          btnStart.className = "w-full py-3.5 px-4 rounded-xl font-bold text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed opacity-60";
-          btnStart.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Scraping in Progress...`;
-          btnStop.disabled = false;
-          btnStop.className = "w-full py-3 px-4 rounded-xl font-bold text-white bg-rose-600 hover:bg-rose-500 shadow-md cursor-pointer transition";
-        } else {
-          badge.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200";
-          badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-slate-400"></span><span>Status: Idle</span>`;
-          btnStart.disabled = false;
-          btnStart.className = "w-full py-3.5 px-4 rounded-xl font-bold text-white bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600 shadow-md shadow-sky-500/25 cursor-pointer transition active:scale-[0.99]";
-          btnStart.innerHTML = `<i class="fa-solid fa-rocket"></i> Start Scraper Now`;
-          btnStop.disabled = true;
-          btnStop.className = "w-full py-3 px-4 rounded-xl font-bold text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed opacity-60";
+          
+          if (startContainer) startContainer.classList.remove('hidden');
+          if (resumeContainer) resumeContainer.classList.add('hidden');
 
-          // If it just finished
+          if (btnStart) {
+            btnStart.disabled = true;
+            btnStart.className = "w-full py-3.5 px-4 rounded-xl font-bold text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed opacity-60 flex items-center justify-center gap-2";
+            btnStart.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Scraping in Progress...`;
+          }
+
+          if (btnStop) {
+            btnStop.disabled = false;
+            btnStop.className = "w-full py-3 px-4 rounded-xl font-bold text-white bg-rose-600 hover:bg-rose-500 shadow-md cursor-pointer transition flex items-center justify-center gap-2";
+            btnStop.innerHTML = `<i class="fa-solid fa-pause"></i> Stop / Pause Session`;
+          }
+        } else {
+          if (btnStop) {
+            btnStop.disabled = true;
+            btnStop.className = "w-full py-3 px-4 rounded-xl font-bold text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed opacity-60 flex items-center justify-center gap-2";
+            btnStop.innerHTML = `<i class="fa-solid fa-pause"></i> Stop / Pause Session`;
+          }
+
+          if (data.can_resume && data.remaining_count > 0) {
+            badge.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200";
+            badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-500"></span><span>Status: Paused</span>`;
+
+            if (startContainer) startContainer.classList.add('hidden');
+            if (resumeContainer) {
+              resumeContainer.classList.remove('hidden');
+              if (resumeCountText) resumeCountText.innerText = data.remaining_count;
+            }
+          } else {
+            badge.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200";
+            badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-slate-400"></span><span>Status: Idle</span>`;
+
+            if (startContainer) startContainer.classList.remove('hidden');
+            if (resumeContainer) resumeContainer.classList.add('hidden');
+
+            if (btnStart) {
+              btnStart.disabled = false;
+              btnStart.className = "w-full py-3.5 px-4 rounded-xl font-bold text-white bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600 shadow-md shadow-sky-500/25 cursor-pointer transition active:scale-[0.99] flex items-center justify-center gap-2";
+              btnStart.innerHTML = `<i class="fa-solid fa-rocket"></i> Start Scraper Now`;
+            }
+          }
+
+          // If it just finished or paused
           if (wasRunning && !isRunning && data.completed > 0) {
-            showCompletionBanner(`Run finished with ${data.success_count} successful and ${data.fail_count} failed records. Saved in Run History.`);
+            if (data.can_resume) {
+              showCompletionBanner(`Scraper paused: ${data.completed} completed, ${data.remaining_count} remaining. Click Resume anytime!`);
+            } else {
+              showCompletionBanner(`Run completed with ${data.success_count} successful and ${data.fail_count} failed records. Saved in Run History.`);
+            }
             loadHistoryTable();
           }
         }
@@ -900,12 +957,45 @@
 
     async function stopScraping() {
       const btnStop = document.getElementById('btnStop');
-      btnStop.disabled = true;
-      btnStop.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Stopping Session...`;
+      if (btnStop) {
+        btnStop.disabled = true;
+        btnStop.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Stopping...`;
+      }
       try {
-        const res = await fetch('/api/stop', { method: 'POST' });
+        await fetch('/api/stop', { method: 'POST' });
+        await updateStatus();
+      } catch (e) {
+        console.error(e);
+        updateStatus();
+      }
+    }
+
+    async function resumeScraping() {
+      const btnResume = document.getElementById('btnResume');
+      if (btnResume) {
+        btnResume.disabled = true;
+        btnResume.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Resuming...`;
+      }
+      try {
+        const res = await fetch('/api/resume', { method: 'POST' });
         const data = await res.json();
-        setTimeout(updateStatus, 400);
+        if (data.success) {
+          setTimeout(updateStatus, 300);
+        } else {
+          alert(data.message || 'Could not resume scraper');
+          updateStatus();
+        }
+      } catch (e) {
+        alert('Network error: ' + e);
+        updateStatus();
+      }
+    }
+
+    async function discardAndStartFresh() {
+      if (!confirm("Are you sure you want to discard remaining paused URLs and start a fresh run?")) return;
+      try {
+        await fetch('/api/reset-session', { method: 'POST' });
+        await updateStatus();
       } catch (e) {
         console.error(e);
       }
@@ -934,15 +1024,15 @@
 
         if (data.success) {
           const item = data.data;
-          document.getElementById('srName').innerText = item['Company Name'] || 'No name found';
-          document.getElementById('srWebsite').innerText = item['Website'] || 'No website';
-          document.getElementById('srWebsite').href = item['Website'] ? (item['Website'].startsWith('http') ? item['Website'] : 'https://' + item['Website']) : '#';
-          document.getElementById('srMethod').innerText = item['Method Used'] || 'Unknown';
-          document.getElementById('srDescription').innerText = item['Description'] || item['About / Overview'] || 'No description extracted.';
-          document.getElementById('srIndustry').innerText = item['Industry'] || '-';
-          document.getElementById('srSize').innerText = item['Company Size'] || '-';
-          document.getElementById('srEmployees').innerText = item['Employee Count'] || '-';
-          document.getElementById('srHeadquarters').innerText = item['Headquarters'] || '-';
+          document.getElementById('srName').innerText = (item['Company Name'] && item['Company Name'] !== '-') ? item['Company Name'] : '-';
+          document.getElementById('srWebsite').innerText = (item['Website'] && item['Website'] !== '-') ? item['Website'] : '-';
+          document.getElementById('srWebsite').href = (item['Website'] && item['Website'] !== '-') ? (item['Website'].startsWith('http') ? item['Website'] : 'https://' + item['Website']) : '#';
+          document.getElementById('srMethod').innerText = (item['Method Used'] && item['Method Used'] !== '-') ? item['Method Used'] : '-';
+          document.getElementById('srDescription').innerText = (item['Description'] && item['Description'] !== '-') ? item['Description'] : ((item['About / Overview'] && item['About / Overview'] !== '-') ? item['About / Overview'] : '-');
+          document.getElementById('srIndustry').innerText = (item['Industry'] && item['Industry'] !== '-') ? item['Industry'] : '-';
+          document.getElementById('srSize').innerText = (item['Company Size'] && item['Company Size'] !== '-') ? item['Company Size'] : '-';
+          document.getElementById('srEmployees').innerText = (item['Employee Count'] && item['Employee Count'] !== '-') ? item['Employee Count'] : '-';
+          document.getElementById('srHeadquarters').innerText = (item['Headquarters'] && item['Headquarters'] !== '-') ? item['Headquarters'] : '-';
 
           document.getElementById('singleResultContainer').classList.remove('hidden');
         } else {
@@ -1001,19 +1091,22 @@
       }
 
       tbody.innerHTML = rows.map(r => {
-        const success = r['Success'] === true || r['Success'] === 'True';
+        const success = r['Success'] === true || r['Success'] === 'True' || r['Success'] === 'Yes';
         const badge = success
           ? `<span class="px-2 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold">Extracted</span>`
           : `<span class="px-2 py-0.5 rounded text-[10px] bg-rose-50 text-rose-700 border border-rose-200 font-bold">Failed</span>`;
 
         const cells = cols.map(c => {
-          let val = r[c] ?? '';
-          if (c === 'Website' && val) {
+          let val = r[c] ?? '-';
+          if (!val || String(val).trim() === '' || String(val).trim().toLowerCase() === 'none') {
+            val = '-';
+          }
+          if (c === 'Website' && val && val !== '-') {
             const url = String(val).startsWith('http') ? val : 'https://' + val;
             return `<td class="px-4 py-3"><a href="${url}" target="_blank" class="text-sky-600 font-semibold hover:underline">${escapeHtml(String(val))}</a></td>`;
           }
           if (c === 'Company Name') {
-            return `<td class="px-4 py-3 font-bold text-slate-900">${escapeHtml(String(val || 'N/A'))}</td>`;
+            return `<td class="px-4 py-3 font-bold text-slate-900">${escapeHtml(String(val || '-'))}</td>`;
           }
           return `<td class="px-4 py-3 text-slate-600 truncate max-w-xs">${escapeHtml(String(val || '-'))}</td>`;
         }).join('');

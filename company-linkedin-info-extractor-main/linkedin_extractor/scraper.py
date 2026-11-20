@@ -29,6 +29,7 @@ import re
 import sys
 import time
 import json
+import threading
 import argparse
 import requests
 from typing import Dict, Any, List
@@ -186,7 +187,9 @@ def _try_googlebot(url: str, timeout: int) -> Dict[str, Any]:
         "Accept-Language": "en-US,en;q=0.5",
     }
     try:
-        resp = requests.get(url, headers=headers, timeout=timeout, allow_redirects=True)
+        connect_t = min(4, timeout)
+        read_t = min(timeout, 8)
+        resp = requests.get(url, headers=headers, timeout=(connect_t, read_t), allow_redirects=True)
         if resp.status_code == 404:
             return {"success": False, "error": "Page not found (404)",
                     "linkedin_url": url, "_is_404": True}
@@ -407,7 +410,9 @@ def _try_jina(url: str, timeout: int) -> Dict[str, Any]:
         "X-Timeout": str(timeout),
     }
     try:
-        resp = requests.get(jina_url, headers=headers, timeout=timeout + 5)
+        connect_t = min(4, timeout)
+        read_t = min(timeout, 8)
+        resp = requests.get(jina_url, headers=headers, timeout=(connect_t, read_t))
         if resp.status_code != 200:
             return {"success": False, "error": f"Jina HTTP {resp.status_code}",
                     "linkedin_url": url}
@@ -496,6 +501,8 @@ def _parse_markdown(content: str, linkedin_url: str) -> Dict[str, Any]:
 
 # ── Method 3: Playwright Stealth ────────────────────────────────────────────
 
+PLAYWRIGHT_LOCK = threading.Lock()
+
 def _try_playwright(url: str, timeout: int) -> Dict[str, Any]:
     """Launch stealth browser and extract data. Skips if playwright not installed."""
     try:
@@ -510,26 +517,45 @@ def _try_playwright(url: str, timeout: int) -> Dict[str, Any]:
 
     about_url = url.rstrip("/") + "/about/"
 
+    # Prevent concurrent Chromium instances from causing Render 512MB RAM freeze
+    acquired = PLAYWRIGHT_LOCK.acquire(timeout=2.0)
+    if not acquired:
+        return {"success": False, "error": "Playwright busy, skipped to prevent memory spike", "linkedin_url": url}
+
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            context = browser.new_context(
-                viewport={"width": 1920, "height": 1080},
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                           "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-                locale="en-US",
+            browser = p.chromium.launch(
+                headless=True,
+                timeout=10000,
+                args=[
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                    "--single-process",
+                    "--no-zygote",
+                ],
             )
-            page = context.new_page()
+            try:
+                context = browser.new_context(
+                    viewport={"width": 1280, "height": 800},
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                               "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+                    locale="en-US",
+                )
+                page = context.new_page()
 
-            if stealth_sync:
-                stealth_sync(page)
+                if stealth_sync:
+                    stealth_sync(page)
 
-            resp = page.goto(about_url, wait_until="domcontentloaded", timeout=timeout * 1000)
-            page.wait_for_timeout(2000)
+                pw_timeout = min(timeout, 8) * 1000
+                resp = page.goto(about_url, wait_until="domcontentloaded", timeout=pw_timeout)
+                page.wait_for_timeout(500)
 
-            pw_status = resp.status if resp else 0
-            html = page.content()
-            browser.close()
+                pw_status = resp.status if resp else 0
+                html = page.content()
+            finally:
+                browser.close()
 
         if pw_status == 404 or re.search(r'Page not found', html):
             return {"success": False, "error": "Page not found (404)",
@@ -553,6 +579,10 @@ def _try_playwright(url: str, timeout: int) -> Dict[str, Any]:
 
     except Exception as e:
         err_msg = str(e)[:200]
+        return {"success": False, "error": f"Playwright error: {err_msg}",
+                "linkedin_url": url}
+    finally:
+        PLAYWRIGHT_LOCK.release()
         return {"success": False, "error": f"Playwright error: {err_msg}",
                 "linkedin_url": url}
 

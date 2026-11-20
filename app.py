@@ -278,12 +278,39 @@ def health():
 
 
 
+def clean_value_or_dash(val, field_name=""):
+    """
+    Format every value cleanly: if empty/blank/None/nan/N/A, strictly return '-'.
+    Also purges XML/Excel control characters (e.g. \\x0b, \\x00-\\x08) to prevent crashes.
+    """
+    if field_name == "Success":
+        if isinstance(val, bool):
+            return "Yes" if val else "No"
+        return str(val) if val else "No"
+
+    if field_name in ("Employees Min", "Employees Max"):
+        if val is None or val == 0 or str(val).strip() in ("", "0", "None"):
+            return "-"
+        return str(val)
+
+    if val is None:
+        return "-"
+    if isinstance(val, bool):
+        return "-"
+
+    s = str(val).strip()
+    if not s or s.lower() in ("none", "nan", "null", "n/a", "unknown", "no name found", "no website", "no data"):
+        return "-"
+
+    # Strip illegal XML/Excel characters
+    s = ILLEGAL_CHARACTERS_RE.sub("", s)
+    s = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]", "", s).strip()
+    return s if s else "-"
+
+
 def clean_for_excel(val):
-    """Strip illegal XML/Excel characters (e.g. \\x0b, \\x00-\\x08) to prevent openpyxl crashes."""
-    if isinstance(val, str):
-        val = ILLEGAL_CHARACTERS_RE.sub("", val)
-        val = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]", "", val)
-    return val
+    """Strip illegal XML/Excel characters and format blanks as '-'."""
+    return clean_value_or_dash(val)
 
 
 ALL_FIELD_EXTRACTORS = {
@@ -306,7 +333,8 @@ ALL_FIELD_EXTRACTORS = {
 
 
 def format_row(r: dict, selected_fields: list = None) -> dict:
-    """Format and sanitize result dictionary into clean row based on selected fields."""
+    """Format and sanitize result dictionary into clean row based on selected fields.
+    Guarantees that ANY blank field returns '-'."""
     if not selected_fields or len(selected_fields) == 0:
         fields_order = [
             "LinkedIn URL", "Company Name", "Website", "Industry",
@@ -328,18 +356,19 @@ def format_row(r: dict, selected_fields: list = None) -> dict:
     for f in fields_order:
         extractor = ALL_FIELD_EXTRACTORS.get(f, lambda x: "")
         val = extractor(r)
-        row[f] = clean_for_excel(val)
+        row[f] = clean_value_or_dash(val, f)
     return row
 
 
 def safe_save(results_list, excel_path=OUTPUT_FILE, csv_path=OUTPUT_CSV):
-    """Safely saves results to Excel and CSV, handling PermissionError if Excel is open."""
+    """Safely saves results to Excel and CSV, ensuring all blanks are '-'."""
     if not results_list:
         return
 
     df = pd.DataFrame(results_list)
+    df = df.fillna("-")
     for col in df.columns:
-        df[col] = df[col].apply(clean_for_excel)
+        df[col] = df[col].apply(lambda v: clean_value_or_dash(v, col))
 
     # 1. Save CSV
     try:
@@ -416,6 +445,7 @@ class ScraperManager:
         self.lock = threading.Lock()
         self.thread = None
         self.is_running = False
+        self.is_paused = False
         self.should_stop = False
         self.total = 0
         self.completed = 0
@@ -424,6 +454,11 @@ class ScraperManager:
         self.current_url = ""
         self.logs = []
         self.session_records = []
+        self.all_urls = []
+        self.remaining_urls = []
+        self.is_manual = False
+        self.active_run_id = ""
+        self.source_name = ""
         self.batch_size = 20
         self.max_workers = 3
         self.timeout = 15
@@ -446,8 +481,18 @@ class ScraperManager:
         with self.lock:
             percent = round((self.completed / self.total * 100), 1) if self.total > 0 else 0
             latest = list(reversed(self.session_records[-50:])) if self.session_records else []
+            rem_count = len(self.remaining_urls) if self.remaining_urls else 0
+            can_resume = bool(
+                not self.is_running
+                and rem_count > 0
+                and self.completed > 0
+                and self.completed < self.total
+            )
             return {
                 "is_running": self.is_running,
+                "is_paused": self.is_paused,
+                "can_resume": can_resume,
+                "remaining_count": rem_count,
                 "total": self.total,
                 "completed": self.completed,
                 "success_count": self.success_count,
@@ -466,6 +511,7 @@ class ScraperManager:
                 return False, "Scraper is already running for your account"
 
             self.is_running = True
+            self.is_paused = False
             self.should_stop = False
             self.max_workers = max_workers
             self.timeout = timeout
@@ -473,17 +519,25 @@ class ScraperManager:
             self.selected_fields = selected_fields
             self.user_email = (user_email or self.user_email or "").lower().strip()
             self.executed_by = executed_by or "Team Member"
-            self.completed = 0
-            self.success_count = 0
-            self.fail_count = 0
-            self.session_records = []
+            self.is_manual = is_manual
             self.current_url = ""
             self.logs = []
             self.last_completed_run = None
 
+            if not resume:
+                self.all_urls = list(dict.fromkeys(urls))
+                self.remaining_urls = list(self.all_urls)
+                self.total = len(self.all_urls)
+                self.completed = 0
+                self.success_count = 0
+                self.fail_count = 0
+                self.session_records = []
+                self.active_run_id = f"run_{get_ist_now_str('%Y%m%d_%H%M%S')}"
+                self.source_name = f"Pasted URLs ({len(self.all_urls)})" if is_manual else f"Excel File ({len(self.all_urls)} URLs)"
+
         self.thread = threading.Thread(
             target=self._run_bulk,
-            args=(urls, resume, is_manual),
+            args=(self.remaining_urls if resume else self.all_urls, resume, is_manual),
             daemon=True
         )
         self.thread.start()
@@ -494,26 +548,65 @@ class ScraperManager:
             if not self.is_running:
                 return False, "Scraper is not running"
             self.should_stop = True
-            self.add_log("Stop requested. Saving current progress...", "warning")
-            return True, "Stopping..."
+            self.is_running = False
+            self.is_paused = True
+            self.current_url = ""
+            self.add_log("Stop requested by user. Pausing session immediately...", "warning")
+            return True, "Scraper stopped"
 
-    def _run_bulk(self, all_urls, resume, is_manual):
-        pending_urls = list(dict.fromkeys(all_urls))  # deduplicate preserving order
-        run_id = f"run_{get_ist_now_str('%Y%m%d_%H%M%S')}"
-        source_name = f"Pasted URLs ({len(pending_urls)})" if is_manual else f"Excel File ({len(pending_urls)} URLs)"
-
+    def resume_scraping(self):
         with self.lock:
-            self.total = len(pending_urls)
-            self.completed = 0
-            self.success_count = 0
-            self.fail_count = 0
-            self.session_records = []
+            if self.is_running:
+                return False, "Scraper is already running for your account"
+            if not self.remaining_urls:
+                return False, "No remaining URLs to resume"
 
-        self.add_log(f"Starting scraping run [{run_id}] for {len(pending_urls)} URLs...", "info")
+            self.is_running = True
+            self.should_stop = False
+            self.is_paused = False
+            self.current_url = ""
+            urls_to_run = list(self.remaining_urls)
+
+        self.add_log(f"Resuming scraping for {len(urls_to_run)} remaining URLs ({self.completed}/{self.total} previously done)...", "info")
+        self.thread = threading.Thread(
+            target=self._run_bulk,
+            args=(urls_to_run, True, getattr(self, "is_manual", False)),
+            daemon=True
+        )
+        self.thread.start()
+        return True, f"Resumed scraping for {len(urls_to_run)} remaining URLs"
+
+    def reset_session(self):
+        with self.lock:
+            if not self.is_running:
+                self.remaining_urls = []
+                self.all_urls = []
+                self.is_paused = False
+                self.completed = 0
+                self.total = 0
+                self.success_count = 0
+                self.fail_count = 0
+                self.session_records = []
+                self.current_url = ""
+                self.last_completed_run = None
+                self.add_log("Session reset. Ready for a new scraping run.", "info")
+
+    def _run_bulk(self, urls_to_process, resume, is_manual):
+        import concurrent.futures
+
+        pending = list(dict.fromkeys(urls_to_process))
+
+        if not resume:
+            with self.lock:
+                self.total = len(self.all_urls)
+            self.add_log(f"Starting scraping run [{self.active_run_id}] for {len(pending)} URLs...", "info")
+        else:
+            self.add_log(f"Resuming scraping [{self.active_run_id}] for {len(pending)} remaining URLs...", "info")
+
         if self.selected_fields:
             self.add_log(f"Selected Fields: {', '.join(self.selected_fields)}", "info")
 
-        if not pending_urls:
+        if not pending:
             self.add_log("No URLs to scrape.", "error")
             with self.lock:
                 self.is_running = False
@@ -522,107 +615,118 @@ class ScraperManager:
         # Max 3 workers for cloud stability & rate limit prevention
         worker_count = min(max(1, self.max_workers), 3)
 
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=worker_count)
         try:
-            import concurrent.futures
+            futures = {}
+            url_iter = iter(enumerate(pending))
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=worker_count) as executor:
-                futures = {}
-                url_iter = iter(enumerate(pending_urls))
+            # Queue initial tasks
+            for _ in range(worker_count * 2):
+                try:
+                    idx, u = next(url_iter)
+                    fut = executor.submit(scrape_company, u, self.timeout)
+                    futures[fut] = (idx, u)
+                except StopIteration:
+                    break
 
-                # Queue initial tasks (worker_count * 2)
-                for _ in range(worker_count * 2):
-                    try:
-                        idx, u = next(url_iter)
-                        fut = executor.submit(scrape_company, u, self.timeout)
-                        futures[fut] = (idx, u)
-                    except StopIteration:
+            while futures:
+                with self.lock:
+                    if self.should_stop:
+                        self.add_log("Stop confirmed. Stopping remaining tasks safely...", "warning")
+                        for f in list(futures.keys()):
+                            f.cancel()
                         break
 
-                while futures:
-                    # Check stop flag immediately
+                done, _ = concurrent.futures.wait(
+                    futures.keys(),
+                    timeout=0.3,
+                    return_when=concurrent.futures.FIRST_COMPLETED
+                )
+
+                if not done:
+                    continue
+
+                for fut in done:
+                    if fut not in futures:
+                        continue
+                    idx, url = futures.pop(fut)
+
                     with self.lock:
                         if self.should_stop:
-                            self.add_log("Stop signal confirmed. Stopping scraper safely...", "warning")
-                            for f in list(futures.keys()):
-                                f.cancel()
-                            break
-
-                    # Wait up to 0.5s for at least one future to finish
-                    done, _ = concurrent.futures.wait(
-                        futures.keys(),
-                        timeout=0.5,
-                        return_when=concurrent.futures.FIRST_COMPLETED
-                    )
-
-                    if not done:
-                        continue
-
-                    for fut in done:
-                        if fut not in futures:
                             continue
-                        idx, url = futures.pop(fut)
 
+                    try:
+                        res = fut.result()
+                    except Exception as e:
+                        res = {"success": False, "linkedin_url": url, "error": str(e)}
+
+                    success = res.get("success", False)
+                    name = res.get("name", "")
+                    method = res.get("method_used", "")
+                    formatted_single = format_row(res, self.selected_fields)
+
+                    with self.lock:
+                        self.current_url = url
+                        self.completed += 1
+                        self.session_records.append(formatted_single)
+                        if url in self.remaining_urls:
+                            self.remaining_urls.remove(url)
+
+                        if success:
+                            self.success_count += 1
+                            msg = f"SUCCESS: {name or 'Found data'} via {method} ({url})"
+                            lvl = "success"
+                        else:
+                            err = res.get("error", "No data / Protected")
+                            self.fail_count += 1
+                            msg = f"FAILED: {url} -> {err}"
+                            lvl = "error"
+
+                    self.add_log(msg, lvl)
+
+                    # Auto-save every 5 URLs to user's dedicated file
+                    if self.completed % 5 == 0:
+                        with self.lock:
+                            recs_to_save = list(self.session_records)
+                        safe_save(recs_to_save, self.user_output_xlsx, self.user_output_csv)
+
+                    # Submit next URL if not requested to stop
+                    with self.lock:
+                        stopping = self.should_stop
+
+                    if not stopping:
                         try:
-                            res = fut.result()
-                        except Exception as e:
-                            res = {"success": False, "linkedin_url": url, "error": str(e)}
-
-                        success = res.get("success", False)
-                        name = res.get("name", "")
-                        method = res.get("method_used", "")
-                        formatted_single = format_row(res, self.selected_fields)
-
-                        with self.lock:
-                            self.current_url = url
-                            self.completed += 1
-                            self.session_records.append(formatted_single)
-
-                            if success:
-                                self.success_count += 1
-                                msg = f"SUCCESS: {name or 'Found data'} via {method} ({url})"
-                                lvl = "success"
-                            else:
-                                err = res.get("error", "No data / Protected")
-                                self.fail_count += 1
-                                msg = f"FAILED: {url} -> {err}"
-                                lvl = "error"
-
-                        self.add_log(msg, lvl)
-
-                        # Auto-save every 5 URLs to user's dedicated file
-                        if self.completed % 5 == 0:
-                            with self.lock:
-                                recs_to_save = list(self.session_records)
-                            safe_save(recs_to_save, self.user_output_xlsx, self.user_output_csv)
-
-                        # Submit next URL if not requested to stop
-                        with self.lock:
-                            stopping = self.should_stop
-
-                        if not stopping:
-                            try:
-                                next_idx, next_url = next(url_iter)
-                                next_fut = executor.submit(scrape_company, next_url, self.timeout)
-                                futures[next_fut] = (next_idx, next_url)
-                            except StopIteration:
-                                pass
+                            next_idx, next_url = next(url_iter)
+                            next_fut = executor.submit(scrape_company, next_url, self.timeout)
+                            futures[next_fut] = (next_idx, next_url)
+                        except StopIteration:
+                            pass
 
         except Exception as e:
             self.add_log(f"Error during scraping: {str(e)}", "error")
         finally:
+            try:
+                executor.shutdown(wait=False, cancel_futures=True)
+            except Exception:
+                try:
+                    executor.shutdown(wait=False)
+                except Exception:
+                    pass
+
             with self.lock:
                 records_to_save = list(self.session_records)
                 self.is_running = False
                 self.current_url = ""
+                was_stopped = self.should_stop or (len(self.remaining_urls) > 0 and self.completed < self.total)
 
             safe_save(records_to_save, self.user_output_xlsx, self.user_output_csv)
 
             # Record run in persistent history with dedicated files
             if records_to_save:
                 run_entry = add_run_to_history(
-                    run_id,
-                    source_name,
-                    len(pending_urls),
+                    self.active_run_id,
+                    self.source_name,
+                    self.total,
                     self.success_count,
                     self.fail_count,
                     self.selected_fields,
@@ -633,7 +737,10 @@ class ScraperManager:
                 with self.lock:
                     self.last_completed_run = run_entry
 
-            self.add_log(f"Scraping run completed! {len(records_to_save)} records saved cleanly in Run History.", "success")
+            if was_stopped:
+                self.add_log(f"Scraper paused. {self.completed}/{self.total} completed ({len(self.remaining_urls)} remaining). Click Resume anytime.", "warning")
+            else:
+                self.add_log(f"Scraping run completed! All {len(records_to_save)} records saved cleanly in Run History.", "success")
 
 
 # Multi-User Isolated Managers
@@ -734,6 +841,26 @@ def api_stop():
     mgr = get_user_manager(user_email)
     ok, msg = mgr.stop_scraping()
     return jsonify({"success": ok, "message": msg})
+
+
+@app.route("/api/resume", methods=["POST"])
+def api_resume():
+    user = session.get("user", {})
+    user_email = user.get("email", "").lower().strip()
+    mgr = get_user_manager(user_email)
+    ok, msg = mgr.resume_scraping()
+    if ok:
+        return jsonify({"success": True, "message": msg})
+    return jsonify({"success": False, "message": msg}), 400
+
+
+@app.route("/api/reset-session", methods=["POST"])
+def api_reset_session():
+    user = session.get("user", {})
+    user_email = user.get("email", "").lower().strip()
+    mgr = get_user_manager(user_email)
+    mgr.reset_session()
+    return jsonify({"success": True, "message": "Session reset successfully"})
 
 
 @app.route("/api/scrape-single", methods=["POST"])
