@@ -352,13 +352,9 @@
               <input type="checkbox" name="fieldPick" value="Followers" checked class="w-4 h-4 accent-sky-600 rounded cursor-pointer">
               <span>Followers</span>
             </label>
-            <label class="flex items-center gap-2 p-2 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition select-none">
+            <label class="col-span-2 flex items-center gap-2 p-2 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition select-none">
               <input type="checkbox" name="fieldPick" value="About / Overview" checked class="w-4 h-4 accent-sky-600 rounded cursor-pointer">
               <span>About / Overview</span>
-            </label>
-            <label class="flex items-center gap-2 p-2 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition select-none">
-              <input type="checkbox" name="fieldPick" value="Description" class="w-4 h-4 accent-sky-600 rounded cursor-pointer">
-              <span>Description</span>
             </label>
           </div>
           
@@ -465,7 +461,7 @@
             </div>
 
             <p id="srDescription" class="text-sm text-slate-700 leading-relaxed bg-white p-4 rounded-xl border border-slate-200">
-              Description...
+              About / Overview...
             </p>
 
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">
@@ -1031,7 +1027,7 @@
           document.getElementById('srWebsite').innerText = (item['Website'] && item['Website'] !== '-') ? item['Website'] : '-';
           document.getElementById('srWebsite').href = (item['Website'] && item['Website'] !== '-') ? (item['Website'].startsWith('http') ? item['Website'] : 'https://' + item['Website']) : '#';
           document.getElementById('srMethod').innerText = (item['Method Used'] && item['Method Used'] !== '-') ? item['Method Used'] : '-';
-          document.getElementById('srDescription').innerText = (item['Description'] && item['Description'] !== '-') ? item['Description'] : ((item['About / Overview'] && item['About / Overview'] !== '-') ? item['About / Overview'] : '-');
+          document.getElementById('srDescription').innerText = (item['About / Overview'] && item['About / Overview'] !== '-') ? item['About / Overview'] : ((item['Description'] && item['Description'] !== '-') ? item['Description'] : '-');
           document.getElementById('srIndustry').innerText = (item['Industry'] && item['Industry'] !== '-') ? item['Industry'] : '-';
           document.getElementById('srSize').innerText = (item['Company Size'] && item['Company Size'] !== '-') ? item['Company Size'] : '-';
           document.getElementById('srEmployees').innerText = (item['Employee Count'] && item['Employee Count'] !== '-') ? item['Employee Count'] : '-';

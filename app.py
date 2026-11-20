@@ -338,7 +338,7 @@ def format_row(r: dict, selected_fields: list = None) -> dict:
     if not selected_fields or len(selected_fields) == 0:
         fields_order = [
             "LinkedIn URL", "Company Name", "Website", "Industry",
-            "About / Overview", "Description", "Company Size",
+            "About / Overview", "Company Size",
             "Employee Count", "Employees Min", "Employees Max",
             "Headquarters", "Founded", "Followers", "Method Used", "Success"
         ]
